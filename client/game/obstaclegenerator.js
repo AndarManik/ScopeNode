@@ -162,3 +162,18 @@ const ccwDelta = (a0, a1) => {
   if (d <= 0) d += 2 * Math.PI;
   return d;
 };
+
+
+export const generateObstacle = (game, position) => {
+  const randomAlpha = Math.random();
+  const triangle = spawnTriangleCentered(
+    randomAlpha,
+    (game.obstacleArea * game.playerRadius) ** 2,
+    game.minObstacleDeg
+  );
+  const randomAngle = Math.PI * 2 * Math.random();
+  const rotatedTriangle = transformPoints(position, randomAngle, triangle);
+  const mTriangle = minkowskiSum(rotatedTriangle, game.playerRadius, game.minkowskiDeg)
+  const mDoubleTriangle = minkowskiSum(rotatedTriangle, game.playerRadius, 4 * game.minkowskiDeg)
+  return { triangle: rotatedTriangle, pathTriangle: mTriangle, previewTriangle: mDoubleTriangle }
+}

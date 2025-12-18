@@ -1,32 +1,28 @@
 import {
-  spawnTriangleCentered,
-  transformPoints,
-} from "./game/obstaclebuilder.js";
+  generateObstacle,
+} from "./game/obstaclegenerator.js";
 import { newVirtualServer } from "./game/virtualserver.js";
 import { jiggleApp } from "./screentransform.js";
 import { values } from "./values.js";
-import "./game/martinez.min.js";
+import { newObstacleBlockers, pushObstacle } from "./game/obstaclevalidator.js";
+
 export const newGame = (app, options, team1, team2) => {
   app.game?.destroy();
 
   const game = {};
 
   // COLD VARIABLES
-  const { mapWidth, mapHeight, minObstacleDeg } = values;
-  const { playerRadius, moveSpeed, obstacleArea } = parseGameOptions(
-    app,
-    options
-  );
+  Object.assign(game, values);
+  parseGameOptions(app, game, options);
+
+  const { playerRadius, moveSpeed, mapWidth, mapHeight } = game;
+
 
   // WARM VARIABLES
   const renderSettings = app.settings.render;
 
   // HOT VARIABLES
   const color = app.color;
-
-  game.team1Spawn = [3 * playerRadius, mapHeight / 2];
-  game.team2Spawn = [mapWidth - 3 * playerRadius, mapHeight / 2];
-  game.centerObjective = [mapWidth / 2, mapHeight / 2];
 
   game.isSinglePlayer = !team1 || !team2;
   game.isMultiPlayer = team1 && team2;
@@ -40,6 +36,10 @@ export const newGame = (app, options, team1, team2) => {
   game.playerIsTeam1 = game.isSinglePlayer || team1.has(game.userId);
   game.playerIsTeam2 = game.isMultiPlayer && team2.has(game.userId);
 
+  game.team1Spawn = [3 * playerRadius, mapHeight / 2];
+  game.team2Spawn = [mapWidth - 3 * playerRadius, mapHeight / 2];
+  game.centerObjective = [mapWidth / 2, mapHeight / 2];
+
   if (game.playerIsTeam1) game.playerPosition = [...game.team1Spawn];
   if (game.playerIsTeam2) game.playerPosition = [...game.team2Spawn];
 
@@ -47,22 +47,14 @@ export const newGame = (app, options, team1, team2) => {
 
   game.virtualServer = newVirtualServer(game, app.socket, team1, team2);
 
-  game.obstacles = null;
+  game.obstacleBlockers = newObstacleBlockers(game);
+
   if (game.isSinglePlayer) {
     for (let index = 0; index < 10; index++) {
-      const triangle = spawnTriangleCentered(
-        Math.random(),
-        (obstacleArea * playerRadius) ** 2,
-        minObstacleDeg
-      );
-      const position = [Math.random() * mapWidth, Math.random() * mapHeight];
-      const angle = Math.PI * 2 * Math.random();
-      const positionedTriangle = [[transformPoints(position, angle, triangle)]];
-
-      if (!game.obstacles) game.obstacles = positionedTriangle;
-      else game.obstacles = martinez.union(game.obstacles, positionedTriangle);
+      const randomPosition = [Math.random() * mapWidth, Math.random() * mapHeight];
+      const obstacle = generateObstacle(game, randomPosition);
+      if (!pushObstacle(game, obstacle)) index--;
     }
-    console.log(game.obstacles);
   }
 
   const update = (delta) => {
@@ -99,18 +91,22 @@ export const newGame = (app, options, team1, team2) => {
     ctx.fill();
 
     // draw obstacles
-    ctx.fillStyle = color.obstacleColor(0);
-    ctx.beginPath();
-    for (const poly of game.obstacles) {
-      // poly = [ outerRing, hole1, hole2, ... ]
-      for (const ring of poly) {
-        if (!ring || ring.length < 3) continue;
-        ctx.moveTo(ring[0][0], ring[0][1]);
-        for (let k = 1; k < ring.length; k++)
-          ctx.lineTo(ring[k][0], ring[k][1]);
-        ctx.closePath();
+    let colorIndex = 0;
+    if (game.obstacleRenderGroups) {
+
+      for (const group of game.obstacleRenderGroups) {
+        ctx.fillStyle = color.obstacleColor(colorIndex++);
+        ctx.beginPath();
+
+        for (const poly of group) {
+          ctx.moveTo(poly[0][0], poly[0][1]);
+          for (let k = 1; k < poly.length; k++)
+            ctx.lineTo(poly[k][0], poly[k][1]);
+          ctx.closePath();
+        }
+
+        ctx.fill("nonzero")
       }
-      ctx.fill("nonzero");
     }
 
     // draw player shadow
@@ -196,30 +192,31 @@ export const newGame = (app, options, team1, team2) => {
   return game;
 };
 
-const parseGameOptions = (app, options) => {
+const parseGameOptions = (app, game, options) => {
+  // start from defaults
+  Object.assign(game, app.settings.game);
+
   switch (options) {
     case "small":
-      return {
-        playerRadius: 27,
-        moveSpeed: 5,
-        obstacleArea: 5,
-      };
+      game.playerRadius = 27;
+      game.moveSpeed = 5;
+      game.obstacleArea = 5;
+      break;
+
     case "medium":
-      return {
-        playerRadius: 18,
-        moveSpeed: 6,
-        obstacleArea: 5,
-      };
+      game.playerRadius = 18;
+      game.moveSpeed = 6;
+      game.obstacleArea = 5;
+      break;
+
     case "large":
-      return {
-        playerRadius: 12,
-        moveSpeed: 7,
-        obstacleArea: 5,
-      };
-    default:
-      return app.settings.game;
+      game.playerRadius = 12;
+      game.moveSpeed = 7;
+      game.obstacleArea = 5;
+      break;
   }
 };
+
 
 const newGameCanvas = (scale, mapWidth, mapHeight) => {
   const canvas = document.getElementById("Game");
