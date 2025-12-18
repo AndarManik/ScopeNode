@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WebSocket Test</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --dark: oklch(0.19 0 0);
+        --transDark: oklch(0.19 0 0 / 0.3);
+        --light: oklch(0.85 0 0);
+      }
+
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+
+        font-family: "Orbitron";
+        font-weight: 900;
+        font-size: 20px;
+
+        border-radius: 2px;
+      }
+
+      *::selection {
+        background: var(--dark);
+        color: var(--light);
+      }
+
+      input,
+      textarea,
+      select {
+        border: 0 !important;
+        outline: 0 !important;
+        box-shadow: none !important;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      input::placeholder,
+      textarea::placeholder {
+        color: var(--dark);
+        opacity: 1;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        height: 100vh;
+
+        background-color: var(--dark);
+
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button {
+        background-color: var(--input);
+        color: var(--dark);
+
+        border: none;
+        outline: none;
+        cursor: pointer;
+
+        transition: background-color 0.15s ease, transform 0.05s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      #App {
+        height: 768px;
+        width: 1024px;
+      }
+
+      #Game {
+        position: absolute;
+        width: 1024px;
+        height: 768px;
+      }
+
+      #Menu {
+        position: absolute;
+
+        width: 1024px;
+        height: 768px;
+
+        display: grid;
+        grid-template-columns: repeat(auto-fill, 56px);
+        grid-template-rows: repeat(auto-fill, 56px);
+        gap: 8px;
+
+        padding: 4px;
+
+        justify-content: center;
+        align-content: center;
+
+        backdrop-filter: blur(8px);
+        background-color: var(--transDark);
+      }
+
+      #Menu > * {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        line-break: strict;
+        padding: 8px;
+        opacity: 1;
+      }
+
+      #Stats {
+        position: absolute;
+        top: 8px;
+        background: #00000000;
+        color: var(--light);
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="App">
+      <canvas id="Game" width="1024" height="768"> </canvas>
+      <div id="Menu"></div>
+    </div>
+    <p id="Stats"></p>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
