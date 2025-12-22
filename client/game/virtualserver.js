@@ -1,7 +1,8 @@
 import { pack, unpack } from "./binary.js";
 
 const VTICK = 64;
-export const newVirtualServer = (game, socket, team1, team2) => {
+export const newVirtualServer = (game, app, team1, team2) => {
+  const { socket, stats } = app;
   let HZ = 64;
 
   const all = [...team1, ...team2];
@@ -9,6 +10,7 @@ export const newVirtualServer = (game, socket, team1, team2) => {
   const allInv = {};
   all.forEach((uuid, index) => (allInv[uuid] = index));
 
+  let isAlive = true;
   let localState = buildInitialState(game, all, team1, game.userId);
   const localHistory = [localState];
   const globalStates = new Map();
@@ -23,29 +25,38 @@ export const newVirtualServer = (game, socket, team1, team2) => {
     globalHistories.set(uuid, [state]);
   });
 
+  // idempotent
   virtualServer.addState = (packedState) => {
     const { uuid, state } = unpack(all, packedState);
+    const tick = state.tick[1];
+    if (tick < processedTick) return;
     const userHistory = globalHistories.get(uuid);
-    const tick = state.tick[0];
-    if (
-      !userHistory.length ||
-      userHistory[userHistory.length - 1].tick[0] < tick
-    ) {
+    const n = userHistory.length;
+    if (n === 0) {
       globalStates.set(uuid, state);
       userHistory.push(state);
-    } else {
-      let low = 0;
-      let high = userHistory.length;
-      while (low < high) {
-        const mid = (low + high) >>> 1;
-        if (userHistory[mid].tick[0] < tick) low = mid + 1;
-        else high = mid;
-      }
-      userHistory.splice(low, 0, state);
+      return;
     }
+    const lastTick = userHistory[n - 1].tick[1];
+    if (lastTick < tick) {
+      globalStates.set(uuid, state);
+      userHistory.push(state);
+      return;
+    }
+    if (lastTick === tick) return;
+    let low = 0;
+    let high = n;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      const midTick = userHistory[mid].tick[1];
+      if (midTick < tick) low = mid + 1;
+      else high = mid;
+    }
+    if (low < n && userHistory[low].tick[1] === tick) return;
+    userHistory.splice(low, 0, state);
   };
 
-  const alpha = 0.01;
+  const alpha = 0.1;
   const invalpha = 1 - alpha;
 
   let tick = 0;
@@ -86,7 +97,8 @@ export const newVirtualServer = (game, socket, team1, team2) => {
       tick: [startTick, tick],
       vector,
       position: [...game.playerPosition],
-      isClicking: game.isClicking,
+      path: game.path,
+      light: game.playerLight,
     };
 
     localHistory.push(localState);
@@ -97,6 +109,15 @@ export const newVirtualServer = (game, socket, team1, team2) => {
 
     const lag = tick - (localHistory[0]?.tick[0] || tick);
     expAvg = invalpha * expAvg + alpha * lag;
+
+    if (game.isMultiPlayer) {
+      const log = stats.log;
+      log.set("PING", (expAvg * 1000) / (HZ * (1 + stretchExp)));
+      log.set("L vTick", HZ * (1 + lamportExp));
+      log.set("S vTick", HZ * (1 + speculExp));
+      log.set("H vTick", HZ * (1 + headroomExp));
+      log.set("T vTick", HZ * (1 + stretchExp));
+    }
 
     setTimeout(nextTick, 1000 / HZ);
   };
@@ -162,31 +183,21 @@ export const newVirtualServer = (game, socket, team1, team2) => {
 
     processedTick = min + 1;
 
-    game.processStates(tickSlice, processedTick, tick);
+    game.processStates(tickSlice, min);
 
     return true;
   };
 
-  const stats = document.getElementById("Stats");
-  const logTick = () => {
-    if (game.isDead) return;
-    stats.innerText =
-      "PING: " +
-      Math.round((expAvg * 1000) / (HZ * (1 + stretchExp))) +
-      "\nL vTICK: " +
-      Math.round(10 * HZ * (1 + lamportExp)) / 10 +
-      "\nS vTICK: " +
-      Math.round(10 * HZ * (1 + speculExp)) / 10 +
-      "\nH vTICK: " +
-      Math.round(10 * HZ * (1 + headroomExp)) / 10 +
-      "\nT vTICK: " +
-      Math.round(10 * HZ * (1 + stretchExp)) / 10;
-    setTimeout(logTick, 1500);
+  virtualServer.playerDied = (uuid) => {
+    if (uuid === game.userId) {
+      socket.json({ command: "died" });
+      isAlive = false;
+      return;
+    }
   };
 
   virtualServer.start = () => {
     nextTick();
-    if (game.isMultiPlayer) logTick();
   };
 
   window.HZ = (hz) => (HZ = hz);
@@ -203,4 +214,6 @@ const buildInitialState = (game, all, team1, uuid) => ({
     .filter((otherUUID) => otherUUID !== uuid)
     .map((uuid) => [uuid, 0]),
   position: team1.has(uuid) ? game.team1Spawn : game.team2Spawn,
+  path: [],
+  light: [[], []],
 });
