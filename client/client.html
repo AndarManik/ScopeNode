@@ -11,9 +11,9 @@
     />
     <style>
       :root {
-        --dark: oklch(0.19 0 0);
-        --transDark: oklch(0.19 0 0 / 0.3);
-        --light: oklch(0.85 0 0);
+        --dark: oklch(0.09 0 0);
+        --transDark: oklch(0.09 0 0 / 0.3);
+        --light: oklch(0.9 0 0);
       }
 
       *,
@@ -27,7 +27,8 @@
         font-weight: 900;
         font-size: 20px;
 
-        border-radius: 2px;
+        border-radius: 4px;
+        corner-shape: squircle;
       }
 
       *::selection {
@@ -52,6 +53,7 @@
 
       body {
         display: flex;
+        gap: 8px;
         align-items: center;
         justify-content: center;
 
@@ -122,6 +124,29 @@
         opacity: 1;
       }
 
+      #Huge {
+        position: absolute;
+        display: flex;
+        font-size: 512px;
+        color: var(--light);
+        width: 1024px;
+        height: 768px;
+        text-align: center;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        opacity: 0.9;
+        transition: none;
+
+        text-shadow: 0 0 8px color-mix(in srgb, var(--input) 60%, transparent),
+          0 0 16px color-mix(in srgb, var(--input) 50%, transparent),
+          0 0 32px color-mix(in srgb, var(--input) 40%, transparent);
+      }
+
+      #Huge.fading-out {
+        transition: opacity 1000ms ease-in;
+      }
+
       #Stats {
         position: absolute;
         top: 8px;
@@ -134,10 +159,10 @@
   <body>
     <div id="App">
       <canvas id="Game" width="1024" height="768"> </canvas>
+      <div id="Huge"></div>
       <div id="Menu"></div>
     </div>
     <p id="Stats"></p>
-
     <script src="./app.js" type="module"></script>
   </body>
 </html>

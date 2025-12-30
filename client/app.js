@@ -4,11 +4,12 @@ import { newSocket } from "./clientSocket.js";
 import { newMenu } from "./menu.js";
 import { main } from "./menu/main.js";
 import { newGame } from "./game.js";
-
+import { newStats } from "./stats.js";
 //import "./gamealpha/alpha/client.js";
 
 const app = {};
 addUserSettings(app);
+app.stats = newStats(app);
 app.color = newColor(app);
 app.game = newGame(app);
 app.socket = newSocket(app);

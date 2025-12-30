@@ -9,7 +9,7 @@ export const settings = (app) => {
   menu.scene = settings;
 
   const title = menu.newEl(6, 1, 6, 1);
-  title.innerText = "Scope Node: Insta Kill";
+  title.innerText = "Scope Node: Protocol";
 
   const returnButton = menu.newEl(15, 1, 2, 1, "button");
   returnButton.innerText = "Back";
@@ -38,5 +38,52 @@ export const settings = (app) => {
     nameInputDebounce = setTimeout(() => {
       socket.json({ command: "name change", name: nameInput.value });
     }, 1000);
+  });
+
+  // Row 1 (y = 3)
+  const samples = [
+    "--lightLeft",
+    "--inputLeft",
+    "--inputLeftOff",
+    "--light",
+    "--input",
+    "--inputOff",
+    "--lightRight",
+    "--inputRight",
+    "--inputRightOff",
+  ];
+
+  const startX = 3;
+  const startY = 6;
+  const endX = 5;
+
+  let x = startX;
+  let y = startY;
+
+  for (const cssVar of samples) {
+    const el = menu.newEl(x, y, 1, 1, "div");
+    el.style.backgroundColor = `var(${cssVar})`;
+
+    x++;
+    if (x > endX) {
+      x = startX;
+      y++;
+    }
+  }
+
+  const hueTitle = menu.newEl(8, 3, 8, 1, "div");
+  hueTitle.innerText = "Game Hue";
+
+  const hueInput = menu.newEl(8, 4, 8, 1, "input");
+  hueInput.type = "range";
+  hueInput.min = "0";
+  hueInput.max = "360";
+  hueInput.step = "1";
+  hueInput.value = app.color.hue ?? 0;
+  hueInput.style.backgroundColor = "var(--input)";
+
+  hueInput.addEventListener("input", () => {
+    const hue = Number(hueInput.value);
+    app.color.setHue(hue);
   });
 };

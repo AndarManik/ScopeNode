@@ -1,3 +1,38 @@
+// The path that a circle takes as it rolls around the perimeter of a polygon,
+// it's center traces a path which is circle radius larger than the polygon.
+// This is a minkowski sum of a circle with the polygon.
+
+// The minkowski sum special cased for a circle on a polygon can be computed by
+// 1. expanding edges outward by the circle radius
+// 2. approximating circle boundary at vertices
+
+export const generateObstacle = (game) => {
+  const randomAlpha = Math.random();
+  const area = (game.obstacleArea * game.playerRadius) ** 2;
+  const minDeg = game.minObstacleDeg;
+  const triangle = spawnTriangleCentered(randomAlpha, area, minDeg);
+
+  const randomAngle = Math.PI * 2 * Math.random();
+  const rotatedTriangle = transformPoints([0, 0], randomAngle, triangle);
+
+  const mTriangle = minkowskiSum(
+    rotatedTriangle,
+    game.playerRadius,
+    game.minkowskiDeg
+  );
+  const mDoubleTriangle = minkowskiSum(
+    rotatedTriangle,
+    2 * game.playerRadius,
+    4 * game.minkowskiDeg
+  );
+  return {
+    poly: rotatedTriangle,
+    pathPoly: mTriangle,
+    previewPoly: mDoubleTriangle,
+  };
+};
+
+// rotates around[0,0]
 export const transformPoints = ([tx, ty], theta, points) => {
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
@@ -7,7 +42,7 @@ export const transformPoints = ([tx, ty], theta, points) => {
   ]);
 };
 
-export const spawnTriangleCentered = (alpha, area, minDeg) => {
+const spawnTriangleCentered = (alpha, area, minDeg) => {
   const [A, B, C] = anglesFromAlpha(alpha, minDeg);
 
   const sA = Math.sin(A),
@@ -38,16 +73,6 @@ export const spawnTriangleCentered = (alpha, area, minDeg) => {
 };
 
 const anglesFromAlpha = (alpha, minDeg) => {
-  const clamp01 = (x) => Math.max(0, Math.min(1, x));
-  const smoothstep = (u) => u * u * (3 - 2 * u);
-  const mix3 = (p, q, t) => {
-    return [
-      (1 - t) * p[0] + t * q[0],
-      (1 - t) * p[1] + t * q[1],
-      (1 - t) * p[2] + t * q[2],
-    ];
-  };
-
   const min = (minDeg * Math.PI) / 180;
   if (!(min > 0 && min < Math.PI / 3))
     throw new Error("minDeg must satisfy 0 < minDeg < 60.");
@@ -141,6 +166,16 @@ export const minkowskiSum = (triangle, playerRadius, angleStepDeg) => {
   return out;
 };
 
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const smoothstep = (u) => u * u * (3 - 2 * u);
+const mix3 = (p, q, t) => {
+  return [
+    (1 - t) * p[0] + t * q[0],
+    (1 - t) * p[1] + t * q[1],
+    (1 - t) * p[2] + t * q[2],
+  ];
+};
+
 const twiceArea = (a, b, c) =>
   (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
 
@@ -162,18 +197,3 @@ const ccwDelta = (a0, a1) => {
   if (d <= 0) d += 2 * Math.PI;
   return d;
 };
-
-
-export const generateObstacle = (game, position) => {
-  const randomAlpha = Math.random();
-  const triangle = spawnTriangleCentered(
-    randomAlpha,
-    (game.obstacleArea * game.playerRadius) ** 2,
-    game.minObstacleDeg
-  );
-  const randomAngle = Math.PI * 2 * Math.random();
-  const rotatedTriangle = transformPoints(position, randomAngle, triangle);
-  const mTriangle = minkowskiSum(rotatedTriangle, game.playerRadius, game.minkowskiDeg)
-  const mDoubleTriangle = minkowskiSum(rotatedTriangle, game.playerRadius, 4 * game.minkowskiDeg)
-  return { triangle: rotatedTriangle, pathTriangle: mTriangle, previewTriangle: mDoubleTriangle }
-}

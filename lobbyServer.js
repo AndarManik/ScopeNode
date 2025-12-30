@@ -12,16 +12,21 @@ export const newLobbyServer = (webSocketServer) => {
   lobbyServer.trackDownload = (message) => {
     const bytes = getMessageSize(message);
     download += bytes;
-    setTimeout(() => (download -= bytes), 5000);
+    setTimeout(() => (download -= bytes), 1000);
   };
   let upload = 0;
   lobbyServer.trackUpload = (message) => {
     const bytes = getMessageSize(message);
     upload += bytes;
-    setTimeout(() => (upload -= bytes), 5000);
+    setTimeout(() => (upload -= bytes), 1000);
   };
+
   lobbyServer.logNetwork = setInterval(() => {
-    //console.log("^" + upload / 5, "v" + download / 5);
+    return;
+    console.log(
+      "^" + formatMetric(upload) + "/s",
+      "v" + formatMetric(download) + "/s"
+    );
   }, 1000);
 
   lobbyServer.registerSocket = (socket) => sockets.set(socket.id, socket);
@@ -43,6 +48,8 @@ export const newLobbyServer = (webSocketServer) => {
     socket.lobby = oldSocket.lobby;
 
     socket.json({ command: "socket reconnected" });
+    oldSocket.lastSentMessages.forEach((msg) => socket.send(msg));
+    console.log("sending " + oldSocket.lastSentMessages.length + " messages");
     oldSocket.unsentMessages.forEach((msg) => socket.send(msg));
     console.log("sending " + oldSocket.unsentMessages.length + " messages");
     socket.lobby?.awakeConnection(oldSocket, socket);
@@ -104,3 +111,11 @@ function getMessageSize(message) {
     return message.byteLength ?? message.length;
   return Buffer.byteLength(JSON.stringify(message), "utf8");
 }
+
+const formatMetric = (bytes) => {
+  if (bytes < 1000) return bytes + " B";
+  if (bytes < 1e6) return (bytes / 1e3).toFixed(2) + " KB";
+  if (bytes < 1e9) return (bytes / 1e6).toFixed(2) + " MB";
+  if (bytes < 1e12) return (bytes / 1e9).toFixed(2) + " GB";
+  return (bytes / 1e12).toFixed(2) + " TB";
+};

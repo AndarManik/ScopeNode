@@ -1,7 +1,7 @@
 import "./martinez.min.js";
-
+import { pushPathingObstacle } from "./pathing.js";
 // Obstacles are the primary data for two graph based systems.
-// 1. Path planning 
+// 1. Path planning
 // 2. Shine casting
 
 // The goal for obstacle placement is to give as much freedom of placement
@@ -38,6 +38,83 @@ import "./martinez.min.js";
 //   /       /  fuse      / /_____
 //  /_______/  outside   /_______/
 
+export const pushValidObstacle = (game, obstacle) => {
+  const { poly, pathPoly } = obstacle;
+  const multiPathPoly = toMulti(pathPoly);
+
+  const validationIndex = validateNewObstacle(game, multiPathPoly);
+  if (validationIndex === -1) return false;
+
+  game.obstacles.push(obstacle);
+
+  const totalWithHoles = martinez.union(game.obstacleTotal, multiPathPoly);
+  game.obstacleTotal = removeHoles(totalWithHoles);
+
+  if (validationIndex === game.obstacleGroups.length) {
+    game.obstacleGroups.push(multiPathPoly);
+    game.obstacleRenderGroups.push([poly]);
+    return true;
+  }
+
+  const group = game.obstacleGroups[validationIndex];
+  const groupWithHoles = martinez.union(group, multiPathPoly);
+  game.obstacleGroups[validationIndex] = removeHoles(groupWithHoles);
+  game.obstacleRenderGroups[validationIndex].push(poly);
+
+  return true;
+};
+
+export const validateNewObstacle = (game, obstaclePath) => {
+  const noHoles = removeHoles(martinez.union(game.obstacleTotal, obstaclePath));
+  if (game.obstacleTotal.length > noHoles.length) return -1;
+
+  const { team1, team2, center } = game.obstacleBlockers;
+  if (martinez.union(noHoles, team1).length <= noHoles.length) return -1;
+  if (martinez.union(noHoles, team2).length <= noHoles.length) return -1;
+  if (martinez.union(noHoles, center).length <= noHoles.length) return -1;
+
+  for (let i = 0; i < game.obstacleGroups.length; i++)
+    if (martinez.union(game.obstacleGroups[i], obstaclePath).length === 1)
+      return i; // hit
+
+  return game.obstacleGroups.length;
+};
+
+export const setupObstacleBlockers = (game) => {
+  const { playerRadius, mapWidth, mapHeight } = game;
+  const wmp = mapWidth - playerRadius;
+  const hmp = mapHeight - playerRadius;
+
+  const boundary = [
+    buildBoundaryRect(-1000, -1000, mapWidth + 1000, playerRadius - 1),
+    buildBoundaryRect(-1000, hmp + 1, mapWidth + 1000, mapHeight + 1000),
+    buildBoundaryRect(-1000, playerRadius, playerRadius, hmp),
+    buildBoundaryRect(wmp, playerRadius, mapWidth + 1000, hmp),
+  ];
+
+  game.obstacles = [];
+  game.obstacleGroups = boundary.map(toMulti);
+  game.obstacleGroups.forEach((multi) => {
+    if (!game.obstacleTotal) return (game.obstacleTotal = multi);
+    game.obstacleTotal = removeHoles(martinez.union(game.obstacleTotal, multi));
+  });
+  game.obstacleRenderGroups = [...boundary];
+
+  boundary.forEach((pathPoly) => pushPathingObstacle(game, { pathPoly }));
+
+  const team1 = [[squareAt(game.spawn1)]];
+  const team2 = [[squareAt(game.spawn2)]];
+  const center = [[squareAt(game.centerObjective)]];
+  game.obstacleBlockers = { team1, team2, center };
+};
+
+const buildBoundaryRect = (left, top, right, bottom) => [
+  [left, top],
+  [right, top],
+  [right, bottom],
+  [left, bottom],
+];
+
 const squareAt = ([cx, cy]) => [
   [cx - 1, cy - 1],
   [cx + 1, cy - 1],
@@ -46,58 +123,10 @@ const squareAt = ([cx, cy]) => [
   [cx - 1, cy - 1],
 ];
 
-export const newObstacleBlockers = (game) => {
-  const team1 = [[squareAt(game.team1Spawn)]];
-  const team2 = [[squareAt(game.team2Spawn)]];
-  const center = [[squareAt(game.centerObjective)]];
-  return { team1, team2, center };
-}
-
-export const validateNewObstacle = (game, obstaclePath) => {
-  const noHoles = removeHoles(martinez.union(game.obstacleTotal, obstaclePath));
-  if (game.obstacleTotal.length > noHoles.length) return -1;
-
-  if (martinez.union(noHoles, game.obstacleBlockers.team1).length <= noHoles.length) return -1;
-  if (martinez.union(noHoles, game.obstacleBlockers.team2).length <= noHoles.length) return -1;
-  if (martinez.union(noHoles, game.obstacleBlockers.center).length <= noHoles.length) return -1;
-
-  for (let i = 0; i < game.obstacleGroups.length; i++)
-    if (martinez.union(game.obstacleGroups[i], obstaclePath).length === 1) return i; // hit
-
-  return game.obstacleGroups.length;
-};
+const toMulti = (polygon) => [[[...polygon, polygon[0]]]];
 
 // skip first cause we use it as the init val reduce
 const removeHoles = (holedPolygon) =>
-  holedPolygon.slice(1).reduce((a, p) => martinez.union(a, [[p[0]]]), [[holedPolygon[0][0]]]);
-
-const toMulti = (polygon) => [[[...polygon, polygon[0]]]];
-
-export const pushObstacle = (game, obstacle) => {
-  const { triangle, pathTriangle } = obstacle;
-  const multiPathTriangle = toMulti(pathTriangle);
-  if (!game.obstacleTotal || !game.obstacleGroups) {
-    game.obstacleTotal = multiPathTriangle;
-    game.obstacleGroups = [multiPathTriangle];
-    game.obstacleRenderGroups = [[triangle]];
-    return true;
-  }
-
-  const validationIndex = validateNewObstacle(game, multiPathTriangle);
-  if (validationIndex === -1) {
-    return false;
-  }
-
-  game.obstacleTotal = removeHoles(martinez.union(game.obstacleTotal, multiPathTriangle));
-
-  if (validationIndex === game.obstacleGroups.length) {
-    game.obstacleGroups.push(multiPathTriangle);
-    game.obstacleRenderGroups.push([triangle]);
-    return true
-  }
-
-  game.obstacleGroups[validationIndex] = removeHoles(martinez.union(game.obstacleGroups[validationIndex], multiPathTriangle));
-  game.obstacleRenderGroups[validationIndex].push(triangle);
-
-  return true;
-}
+  holedPolygon
+    .slice(1)
+    .reduce((a, p) => martinez.union(a, [[p[0]]]), [[holedPolygon[0][0]]]);

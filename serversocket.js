@@ -23,11 +23,11 @@ export const newSocketConnector = (lobbyServer) => (socket) => {
   });
 
   socket.unsentMessages = [];
+  socket.lastSentMessages = [];
   socket.realSend = socket.send;
   socket.send = (data) => {
     const { readyState } = socket;
     if (readyState !== WebSocket.OPEN) return socket.unsentMessages.push(data);
-
     if (typeof data === "string")
       console.log(
         "\n==================== SENT ====================",
@@ -36,10 +36,11 @@ export const newSocketConnector = (lobbyServer) => (socket) => {
         JSON.parse(data),
         "\n============================================="
       );
-
     try {
-      socket.realSend(data, (err) => err && socket.unsentMessages.push(data));
+      socket.realSend(data);
       lobbyServer.trackUpload(data);
+      socket.lastSentMessages.push(data);
+      if (socket.lastSentMessages.length > 10) socket.lastSentMessages.shift();
     } catch (err) {
       socket.unsentMessages.push(data);
     }
@@ -108,5 +109,23 @@ const newMessageHandler = (lobbyServer, socket) => (msg, isBinary) => {
 
     case "client ready":
       return socket.lobby?.clientReady(socket);
+
+    case "obstacles":
+      return socket.lobby?.distributeObstacles(socket, message.obstacles);
+
+    case "has obstacles":
+      return socket.lobby?.clientHasObstacles(socket);
+
+    case "virtual server started":
+      return socket.lobby?.virtualServerStarted(socket);
+
+    case "new shots":
+      return socket.lobby?.playerShot(socket, message.newShots, message.tick);
+
+    case "round end":
+      return socket.lobby?.clientRoundEnded(socket);
+
+    case "virtual server stopped":
+      return socket.lobby?.virtualServerStopped(socket);
   }
 };

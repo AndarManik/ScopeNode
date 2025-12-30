@@ -262,7 +262,7 @@ export const drawPolygon = (poly, ctx, color) => {
 export const drawPolygonBordered = (poly, ctx, color, borderColor, line) => {
   if (!poly || poly.length < 3) return;
   ctx.fillStyle = color;
-  ctx.strokeStyle = borderColor
+  ctx.strokeStyle = borderColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(poly[0][0], poly[0][1]);
@@ -360,23 +360,9 @@ export const reDrawObstacleVisibilityLayer = () => {
 };
 
 function createTeamsVisionRenderer(ctx, mapWidth, mapHeight, scale) {
-  const mainCanvas = ctx.canvas;
-
   // Pixel dimensions of the render area
   const pixelWidth = mapWidth * scale;
   const pixelHeight = mapHeight * scale;
-
-  // Sanity check (optional, can be removed in prod)
-  // If this fails, your canvas sizing doesn't match what you told this renderer.
-  if (mainCanvas.width !== pixelWidth || mainCanvas.height !== pixelHeight) {
-    console.warn(
-      "TeamsVisionRenderer: canvas size and (mapWidth * scale, mapHeight * scale) do not match.",
-      {
-        canvas: [mainCanvas.width, mainCanvas.height],
-        expected: [pixelWidth, pixelHeight],
-      }
-    );
-  }
 
   const makeBuffer = () => {
     const c = document.createElement("canvas");

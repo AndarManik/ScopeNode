@@ -1,3 +1,7 @@
+import { newGame } from "./game.js";
+import { lobby, updateLobbyNames, updateLobbySize } from "./menu/lobby.js";
+import { jiggleApp } from "./screentransform.js";
+
 export const newSocket = (app) => {
   const url = `${location.protocol.replace("http", "ws")}//${location.host}`;
 
@@ -6,11 +10,14 @@ export const newSocket = (app) => {
 
   const socket = {};
   socket.unsentMessages = [];
-  socket.message = new Set();
+  socket.lastSentMessages = [];
 
   const sendNow = (message) => {
-    if (hotSocket.readyState === WebSocket.OPEN) hotSocket.send(message);
-    else socket.unsentMessages.push(message);
+    if (hotSocket.readyState !== WebSocket.OPEN)
+      return socket.unsentMessages.push(message);
+    hotSocket.send(message);
+    socket.lastSentMessages.push(message);
+    if (socket.lastSentMessages.length > 10) socket.lastSentMessages.shift();
   };
 
   socket.send = (message) => {
@@ -48,6 +55,7 @@ export const newSocket = (app) => {
       // We have a temp variable here because .send might push into unsentMessages.
       const tempUnsent = socket.unsentMessages;
       socket.unsentMessages = [];
+      tempUnsent.push(...socket.lastSentMessages);
       tempUnsent.forEach(socket.send);
       hotSocket.removeEventListener("message", reconnectMessage);
     };
@@ -56,11 +64,8 @@ export const newSocket = (app) => {
   };
 
   const defaultMessage = (message) => {
-    const handle = () => {
-      for (const messageHandler of socket.message) messageHandler(message);
-    };
-    if (!latencyMs) handle();
-    else setTimeout(handle, latencyMs);
+    if (!latencyMs) handleMessage(app, message);
+    else setTimeout(() => handleMessage(app, message), latencyMs);
   };
 
   const connect = () => {
@@ -83,4 +88,83 @@ export const newSocket = (app) => {
   connect();
 
   return socket;
+};
+
+const handleMessage = (app, message) => {
+  if (typeof message.data !== "string") return app.game.handleMessage(message);
+
+  const { menu } = app;
+  const data = JSON.parse(message.data);
+  console.log(data.command);
+  switch (data.command) {
+    case "lobby user id": {
+      menu.userId = data.userId;
+      updateLobbyNames(menu);
+      return;
+    }
+
+    case "join lobby": {
+      menu.lobbyCode = data.lobbyCode;
+      //always send to lobby
+      return lobby(app);
+    }
+
+    case "lobby users": {
+      menu.team1 = data.team1;
+      menu.team2 = data.team2;
+      menu.spec = data.spec;
+      updateLobbyNames(menu);
+      return;
+    }
+
+    case "map size change": {
+      menu.size = data.size;
+      updateLobbySize(menu);
+      return;
+    }
+
+    case "start game": {
+      const team1 = new Set(data.team1);
+      const team2 = new Set(data.team2);
+      app.game = newGame(app, data.mapSize, team1, team2);
+      jiggleApp();
+      return;
+    }
+
+    case "build obstacles": {
+      app.game.handleBuildObstacles();
+      return;
+    }
+
+    case "obstacles": {
+      app.game.handleObstacles(data.obstacles);
+      return;
+    }
+
+    case "start virtual server": {
+      app.game.startVirtualServer();
+      if (menu.open) menu.toggle();
+      return;
+    }
+
+    case "start round": {
+      app.game.handleStart();
+      return;
+    }
+
+    case "end round": {
+      app.game.handleEndRound(data.winner, data.score);
+      return;
+    }
+
+    case "stop virtual server": {
+      app.game.stopVirtualServer();
+      return;
+    }
+
+    case "end game": {
+      app.game.handleEnd(data.winner, data.score);
+      return;
+    }
+  }
 };

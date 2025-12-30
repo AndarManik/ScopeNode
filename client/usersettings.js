@@ -10,6 +10,7 @@ export const addUserSettings = (app) => {
   game.playerRadius = parseInt(defaultGet("game.playerRadius", 18));
   game.moveSpeed = parseInt(defaultGet("game.moveSpeed", 6));
   game.obstacleArea = parseInt(defaultGet("game.obstacleArea", 5));
+  game.obstacleStartCount = parseInt(defaultGet("game.obstacleStartCount", 10));
 
   const render = {};
   settings.render = render;

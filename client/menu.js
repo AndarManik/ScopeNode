@@ -1,18 +1,22 @@
 import { jiggleApp } from "./screentransform.js";
-import { lobby, updateLobbyNames, updateLobbySize } from "./menu/lobby.js";
 import { settings } from "./menu/settings.js";
-import { newGame } from "./game.js";
 
 export const newMenu = (app) => {
+  const appEl = document.getElementById("App");
   const menuEl = document.getElementById("Menu");
   const menuChildrenEls = new Set();
 
-  const menu = {};
+  const menu = { open: true };
 
   menu.toggle = () => {
-    menuEl.style.display = menuEl.style.display === "none" ? "grid" : "none";
+    menu.open = !menu.open;
+
+    menuEl.style.display = menu.open ? "grid" : "none";
+    appEl.style.cursor = menu.open ? "default" : "none";
+
     jiggleApp();
   };
+
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" && event.key !== "Esc") return;
     menu.toggle();
@@ -126,7 +130,7 @@ export const newMenu = (app) => {
 
   menu.addBasicHeader = () => {
     const title = menu.newEl(6, 1, 6, 1);
-    title.innerText = "Scope Node: Insta Kill";
+    title.innerText = "Scope Node: Protocol";
 
     const settingsButton = menu.newEl(15, 1, 2, 1, "button");
     settingsButton.innerText = "Settings";
@@ -136,58 +140,6 @@ export const newMenu = (app) => {
     escape.innerText = `Esc`;
     escape.addEventListener("click", menu.toggle);
   };
-
-  menu.socketHandler = (message) => {
-    if (typeof message.data !== "string")
-      return app.game.handleMessage(message);
-
-    const data = JSON.parse(message.data);
-    console.log(data.command);
-    switch (data.command) {
-      case "lobby user id": {
-        menu.userId = data.userId;
-        updateLobbyNames(menu);
-        return;
-      }
-
-      case "join lobby": {
-        menu.lobbyCode = data.lobbyCode;
-        //always send to lobby
-        return lobby(app);
-      }
-
-      case "lobby users": {
-        menu.team1 = data.team1;
-        menu.team2 = data.team2;
-        menu.spec = data.spec;
-        updateLobbyNames(menu);
-        return;
-      }
-
-      case "map size change": {
-        menu.size = data.size;
-        updateLobbySize(menu);
-        return;
-      }
-
-      case "start game": {
-        const team1 = new Set(data.team1);
-        const team2 = new Set(data.team2);
-        app.game = newGame(app, data.mapSize, team1, team2);
-        app.socket.json({ command: "client ready" });
-        menu.toggle();
-        jiggleApp();
-        return;
-      }
-
-      case "start virtual server": {
-        app.game.start();
-        return;
-      }
-    }
-  };
-
-  app.socket.message.add(menu.socketHandler);
 
   return menu;
 };
