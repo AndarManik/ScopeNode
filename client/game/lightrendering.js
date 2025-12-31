@@ -32,9 +32,9 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
   const drawPolygon = (cctx, poly) => {
     if (!poly || poly.length < 3) return;
     cctx.beginPath();
-    cctx.moveTo((poly[0][0] * scale), (poly[0][1] * scale));
+    cctx.moveTo(poly[0][0] * scale, poly[0][1] * scale);
     for (let i = 1; i < poly.length; i++) {
-      cctx.lineTo((poly[i][0] * scale), (poly[i][1] * scale));
+      cctx.lineTo(poly[i][0] * scale, poly[i][1] * scale);
     }
     cctx.closePath();
     cctx.fill();

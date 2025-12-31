@@ -1,6 +1,10 @@
 import { moveAlongPath, planPath } from "./pathing.js";
 
 export const update = (game, delta) => {
+  if (game.previewingObstacle) return;
+
+  if (game.choosingObstacle) game.obstacleSendingLoop();
+
   const { moveSpeed, playerRadius } = game;
   game.path = [];
 
@@ -36,7 +40,6 @@ export const update = (game, delta) => {
     if (!game.preRound) moveAlongPath(game.playerPosition, game.path, step);
   }
 
-  //console.log(game.virtualServer.globalStates);
   for (const state of game.virtualServer.globalStates.values()) {
     if (!state.seen) {
       state.seen = true;
@@ -50,7 +53,7 @@ export const update = (game, delta) => {
   }
 
   for (const shot of game.virtualServer.shots) {
-    if (shot.anim > 1) game.virtualServer.shots.delete(shot);
-    shot.anim = (shot.anim || 0) + delta;
+    if (shot.finished) continue;
+    else shot.anim = (shot.anim ?? -delta) + delta;
   }
 };

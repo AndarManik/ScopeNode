@@ -22,7 +22,7 @@ export const newColor = (app) => {
 
   color.setGameByHue = () => {
     const hue = color.hue;
-    color.background = `oklch(0.09 0.015 ${hue})`;
+    color.background = `oklch(0.09 0.015 ${hue + 60})`;
 
     color.team1Player = `oklch(0.82 0.100 ${hue + 45})`;
     color.team2Player = `oklch(0.82 0.100 ${hue - 45})`;
@@ -34,11 +34,16 @@ export const newColor = (app) => {
 
     color.team1Point = `oklch(0.35 0.030 ${hue + 60})`;
     color.team2Point = `oklch(0.35 0.030 ${hue - 60})`;
-    color.intersectPoint = `oklch(0.09 0.015 ${hue})`;
+
+    color.intersectPoint1 = `oklch(0.20 0.030 ${hue - 60})`;
+    color.intersectPoint2 = `oklch(0.20 0.030 ${hue + 60})`;
 
     color.team1Disk = `oklch(0.75 0.125 ${hue + 45})`;
     color.team2Disk = `oklch(0.75 0.125 ${hue - 45})`;
     color.intersectDisk = `oklch(0.86 0.065 ${hue})`;
+
+    color.team1Bullet = `oklch(0.90 0.045 ${hue + 60})`;
+    color.team2Bullet = `oklch(0.90 0.045 ${hue - 60})`;
   };
 
   color.setUIByHue = () => {
@@ -85,7 +90,18 @@ export const newColor = (app) => {
     const { obstacleHueRange, hue } = color;
     const alpha = golden(i);
     const obstacleHue = hue - obstacleHueRange + alpha * obstacleHueRange * 2;
-    return `oklch(0.55 0.04 ${obstacleHue})`;
+    return `oklch(0.55 0.045 ${obstacleHue})`;
+  };
+
+  color.obstacleColorBrilliant = (i) => {
+    if (i === -1) {
+      return `oklch(0.40 0 ${color.hue})`;
+    }
+
+    const { obstacleHueRange, hue } = color;
+    const alpha = golden(i);
+    const obstacleHue = hue - obstacleHueRange + alpha * obstacleHueRange * 2;
+    return `oklch(0.55 0.090 ${obstacleHue})`;
   };
 
   color.setUIByHue();

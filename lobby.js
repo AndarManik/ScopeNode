@@ -9,18 +9,13 @@ export const newLobby = (code) => {
 
   lobby.addConnection = (socket) => {
     socket.userId = crypto.randomUUID();
-
     connected.add(socket);
     if (team1.size + team2.size === 10) spectators.add(socket);
     else if (team1.size > team2.size) team2.add(socket);
     else team1.add(socket);
-
     socket.json({ command: "lobby user id", userId: socket.userId });
-
     lobby.sendNames();
     lobby.sendSize();
-
-    //lobby.log();
   };
 
   lobby.removeConnection = (socket) => {
@@ -29,17 +24,14 @@ export const newLobby = (code) => {
     team2.delete(socket);
     spectators.delete(socket);
     lobby.sendNames();
-    //lobby.log();
   };
 
   lobby.awakeConnection = (oldSocket, socket) => {
     socket.userId = oldSocket.userId;
-
     replaceInSet(connected, oldSocket, socket);
     replaceInSet(team1, oldSocket, socket);
     replaceInSet(team2, oldSocket, socket);
     replaceInSet(spectators, oldSocket, socket);
-    //lobby.log();
   };
 
   lobby.setSize = (size) => {
@@ -67,19 +59,31 @@ export const newLobby = (code) => {
 
   lobby.joinTeam = (socket, team) => {
     if (!connected.has(socket)) return;
-
     if (team === "team1" && team1.size >= 5) return;
     if (team === "team2" && team2.size >= 5) return;
-
     team1.delete(socket);
     team2.delete(socket);
     spectators.delete(socket);
-
     if (team === "team1") team1.add(socket);
     else if (team === "team2") team2.add(socket);
     else spectators.add(socket);
-
     lobby.sendNames();
+  };
+
+  lobby.stateUpdate = (socket, startState, endState) => {
+    if (socket.clientState !== startState) return false;
+    socket.clientState = endState;
+    for (const player of connected)
+      if (player.clientState !== endState) return false;
+    return true;
+  };
+
+  lobby.stateSend = (state, message, exclude) => {
+    connected.forEach((socket) => {
+      if (socket === exclude) return;
+      socket.clientState = state;
+      socket.send(message);
+    });
   };
 
   lobby.startGame = () => {
@@ -103,19 +107,11 @@ export const newLobby = (code) => {
     startData.team1 = [...team1].map(({ userId }) => userId);
     startData.team2 = [...team2].map(({ userId }) => userId);
     const startMessage = JSON.stringify(startData);
-    connected.forEach((socket) => {
-      socket.clientState = "client not ready";
-      socket.send(startMessage);
-    });
+    lobby.stateSend("client not ready", startMessage);
   };
 
   lobby.clientReady = (socket) => {
-    if (socket.clientState !== "client not ready") return;
-    socket.clientState = "client ready";
-
-    for (const player of connected)
-      if (player.clientState !== "client ready") return;
-
+    if (!lobby.stateUpdate(socket, "client not ready", "client ready")) return;
     [...team1][0].json({ command: "build obstacles" });
   };
 
@@ -123,38 +119,22 @@ export const newLobby = (code) => {
     if (socket.clientState !== "client ready") return;
     socket.clientState = "has obstacles";
     lobby.obstacles = obstacles;
-    const obstacleMessage = JSON.stringify({ command: "obstacles", obstacles });
-    connected.forEach((player) => {
-      if (player !== socket) player.send(obstacleMessage);
-    });
+    const message = JSON.stringify({ command: "obstacles", obstacles });
+    connected.forEach((player) => player !== socket && player.send(message));
   };
 
   lobby.clientHasObstacles = (socket) => {
-    if (socket.clientState !== "client ready") return;
-    socket.clientState = "has obstacles";
-
-    for (const player of lobby.players)
-      if (player.clientState !== "has obstacles") return;
-
+    if (!lobby.stateUpdate(socket, "client ready", "has obstacles")) return;
     const startVServer = JSON.stringify({ command: "start virtual server" });
-    connected.forEach((socket) => {
-      socket.clientState = "virtual server not started";
-      socket.send(startVServer);
-    });
+    lobby.stateSend("virtual server not started", startVServer);
   };
 
   lobby.virtualServerStarted = (socket) => {
-    if (socket.clientState !== "virtual server not started") return;
-    socket.clientState = "virtual server started";
-
-    for (const player of lobby.players)
-      if (player.clientState !== "virtual server started") return;
-
+    const startState = "virtual server not started";
+    const endState = "virtual server started";
+    if (!lobby.stateUpdate(socket, startState, endState)) return;
     const startRound = JSON.stringify({ command: "start round" });
-    connected.forEach((socket) => {
-      socket.clientState = "in round";
-      socket.send(startRound);
-    });
+    lobby.stateSend("in round", startRound);
   };
 
   lobby.playerShot = (socket, newShots, tick) => {
@@ -190,45 +170,46 @@ export const newLobby = (code) => {
     winner = team1Alive ? "team1" : team2Alive ? "team2" : "draw";
     const score = lobby.score;
     const endingRound = JSON.stringify({ command: "end round", winner, score });
-    connected.forEach((socket) => (socket.clientState = "ending round"));
-    connected.forEach((socket) => socket.send(endingRound));
+    lobby.stateSend("ending round", endingRound);
   };
 
   lobby.clientRoundEnded = (socket) => {
-    if (socket.clientState !== "ending round") return;
-    socket.clientState = "round ended";
-
-    for (const player of lobby.players)
-      if (player.clientState !== "round ended") return;
-
+    if (!lobby.stateUpdate(socket, "ending round", "round ended")) return;
     lobby.players.forEach((player) => {
       player.isDead = false;
       player.confirmed = new Map();
     });
-
-    const team = winner === "team1" ? team2 : team1;
-    const randomPlayer = [...team][Math.floor(team.size * Math.random())];
-
     const stopVServer = JSON.stringify({ command: "stop virtual server" });
-    connected.forEach((socket) => {
-      socket.clientState = "virtual server not stopped";
-      socket.send(stopVServer);
-    });
+    lobby.stateSend("virtual server not stopped", stopVServer);
   };
 
   lobby.virtualServerStopped = (socket) => {
-    if (socket.clientState !== "virtual server not stopped") return;
-    socket.clientState = "virtual server stopped";
+    const startState = "virtual server not stopped";
+    const endState = "virtual server stopped";
+    if (!lobby.stateUpdate(socket, startState, endState)) return;
+    if (winner === "draw") {
+      const startMessage = JSON.stringify({ command: "start virtual server" });
+      lobby.stateSend("virtual server not started", startMessage);
+      return;
+    }
+    const team = winner === "team1" ? team2 : team1;
+    const randomPlayer = [...team][Math.floor(team.size * Math.random())];
+    randomPlayer.json({ command: "start choosing obstacle" });
+  };
 
-    const players = new Set([...team1, ...team2]);
-    for (const player of players)
-      if (player.clientState !== "virtual server stopped") return;
+  lobby.confirmObstacle = (socket, message) => {
+    if (socket.clientState !== "virtual server stopped") return;
+    socket.clientState = "has confirmed obstacle";
+    const obstacle = JSON.stringify(message);
+    lobby.stateSend("needs confirmed obstacle", obstacle, socket);
+  };
 
+  lobby.clientHasConfirmObstacle = (socket) => {
+    const startState = "needs confirmed obstacle";
+    const endState = "has confirmed obstacle";
+    if (!lobby.stateUpdate(socket, startState, endState)) return;
     const startMessage = JSON.stringify({ command: "start virtual server" });
-    connected.forEach((socket) => {
-      socket.clientState = "virtual server not started";
-      socket.send(startMessage);
-    });
+    lobby.stateSend("virtual server not started", startMessage);
   };
 
   lobby.endGame = (team1Win, team2Win) => {
@@ -236,7 +217,6 @@ export const newLobby = (code) => {
     const score = lobby.score;
     const endingGame = JSON.stringify({ command: "end game", winner, score });
     connected.forEach((socket) => socket.send(endingGame));
-
     lobby.inGame = false;
   };
 

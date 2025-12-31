@@ -157,6 +157,16 @@ const handleMessage = (app, message) => {
       return;
     }
 
+    case "start choosing obstacle": {
+      app.game.startChoosingObstacle();
+      return;
+    }
+
+    case "confirm obstacle": {
+      app.game.confirmPreviewObstacle(data);
+      return;
+    }
+
     case "stop virtual server": {
       app.game.stopVirtualServer();
       return;

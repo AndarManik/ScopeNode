@@ -7,15 +7,19 @@ export const addUserSettings = (app) => {
 
   const game = {};
   settings.game = game;
-  game.playerRadius = parseInt(defaultGet("game.playerRadius", 18));
-  game.moveSpeed = parseInt(defaultGet("game.moveSpeed", 6));
-  game.obstacleArea = parseInt(defaultGet("game.obstacleArea", 5));
+  game.playerRadius = parseFloat(defaultGet("game.playerRadius", 18));
+  game.moveSpeed = parseFloat(defaultGet("game.moveSpeed", 6));
+  game.obstacleArea = parseFloat(defaultGet("game.obstacleArea", 5));
   game.obstacleStartCount = parseInt(defaultGet("game.obstacleStartCount", 10));
 
   const render = {};
   settings.render = render;
-  render.scale = parseInt(defaultGet("render.scale", 2));
+  render.scale = parseFloat(defaultGet("render.scale", 2));
   render.preferredSide = defaultGet("render.preferredSide", "none");
+  render.bulletSpeed = parseFloat(defaultGet("render.bulletSpeed", 50));
+  render.shellEjectAngleDeg = parseFloat(
+    defaultGet("render.shellEjectAngleDeg", 150)
+  );
 };
 
 export const defaultGet = (key, defaultValue) => {

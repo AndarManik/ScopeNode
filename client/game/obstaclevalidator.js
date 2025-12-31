@@ -40,12 +40,13 @@ import { pushPathingObstacle } from "./pathing.js";
 
 export const pushValidObstacle = (game, obstacle) => {
   const { poly, pathPoly } = obstacle;
-  const multiPathPoly = toMulti(pathPoly);
 
-  const validationIndex = validateNewObstacle(game, multiPathPoly);
+  const validationIndex = validateNewObstacle(game, obstacle);
   if (validationIndex === -1) return false;
 
   game.obstacles.push(obstacle);
+
+  const multiPathPoly = toMulti(pathPoly);
 
   const totalWithHoles = martinez.union(game.obstacleTotal, multiPathPoly);
   game.obstacleTotal = removeHoles(totalWithHoles);
@@ -64,7 +65,8 @@ export const pushValidObstacle = (game, obstacle) => {
   return true;
 };
 
-export const validateNewObstacle = (game, obstaclePath) => {
+export const validateNewObstacle = (game, obstacle) => {
+  const obstaclePath = toMulti(obstacle.pathPoly);
   const noHoles = removeHoles(martinez.union(game.obstacleTotal, obstaclePath));
   if (game.obstacleTotal.length > noHoles.length) return -1;
 

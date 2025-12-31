@@ -1,4 +1,5 @@
 import { createTeamsVisionRenderer } from "./lightrendering.js";
+import { animateShot, drawShell } from "./shootanimation.js";
 
 export const render = (game, team1, team2) => {
   const { renderSettings, color, mapWidth, mapHeight, playerRadius } = game;
@@ -26,7 +27,10 @@ export const render = (game, team1, team2) => {
   let colorIndex = 0;
   if (game.obstacleRenderGroups) {
     for (const group of game.obstacleRenderGroups) {
-      ctx.fillStyle = color.obstacleColor(colorIndex++);
+      ctx.fillStyle =
+        game.choosingObstacle || game.previewingObstacle
+          ? color.obstacleColorBrilliant(colorIndex++)
+          : color.obstacleColor(colorIndex++);
       ctx.beginPath();
 
       for (const poly of group) {
@@ -38,6 +42,68 @@ export const render = (game, team1, team2) => {
 
       ctx.fill("nonzero");
     }
+  }
+
+  if (game.choosingObstacle || game.previewingObstacle) {
+    ctx.fillStyle = color.obstacleColorBrilliant(game.previewObstacle.index);
+    ctx.beginPath();
+
+    const { poly } = game.previewObstacle;
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let k = 1; k < poly.length; k++) ctx.lineTo(poly[k][0], poly[k][1]);
+    ctx.closePath();
+
+    ctx.fill("nonzero");
+
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    const { previewPoly } = game.previewObstacle;
+    ctx.moveTo(previewPoly[0][0], previewPoly[0][1]);
+    for (let k = 1; k < previewPoly.length; k++)
+      ctx.lineTo(previewPoly[k][0], previewPoly[k][1]);
+    ctx.closePath();
+
+    ctx.fill("nonzero");
+    ctx.restore();
+
+    ctx.fillStyle = color.centerObjective;
+    ctx.beginPath();
+    ctx.arc(...game.centerObjective, playerRadius, 0, Math.PI * 2); // full circle
+    ctx.fill();
+
+    ctx.fillStyle = color.team1Player;
+    ctx.beginPath();
+    ctx.arc(...game.spawn1, playerRadius, 0, Math.PI * 2); // full circle
+    ctx.fill();
+
+    ctx.fillStyle = color.team2Player;
+    ctx.beginPath();
+    ctx.arc(...game.spawn2, playerRadius, 0, Math.PI * 2); // full circle
+    ctx.fill();
+
+    game.virtualServer.shots.forEach(
+      ({ team1, killerPosition, killedPosition, hit }) => {
+        ctx.strokeStyle = team1 ? color.team1Player : color.team2Player;
+        ctx.lineWidth = (2 * playerRadius) / 5;
+        ctx.beginPath();
+        ctx.moveTo(...killerPosition);
+        ctx.lineTo(...hit);
+        ctx.stroke();
+
+        ctx.fillStyle = team1 ? color.team1Player : color.team2Player;
+        ctx.beginPath();
+        ctx.arc(...killerPosition, playerRadius, 0, Math.PI * 2); // full circle
+        ctx.fill();
+
+        ctx.fillStyle = team1 ? color.team2Player : color.team1Player;
+        ctx.beginPath();
+        ctx.arc(...killedPosition, playerRadius, 0, Math.PI * 2); // full circle
+        ctx.fill();
+      }
+    );
+
+    return;
   }
 
   // draw team lights
@@ -174,37 +240,7 @@ export const render = (game, team1, team2) => {
   }
 
   // render shot
-  game.virtualServer.shots.forEach(
-    ({ team1, killerPosition, killedPosition, hit }) => {
-      ctx.strokeStyle = team1 ? color.team1Player : color.team2Player;
-      ctx.lineWidth = (2 * playerRadius) / 5;
-      ctx.beginPath();
-      ctx.moveTo(...killerPosition);
-      ctx.lineTo(...hit);
-      ctx.stroke();
-
-      ctx.lineWidth = (2 * playerRadius) / 2.5;
-      ctx.strokeStyle = team1 ? color.team1Player : color.team2Player;
-      ctx.beginPath();
-      ctx.arc(
-        ...killerPosition,
-        playerRadius - playerRadius / 2.5,
-        0,
-        Math.PI * 2
-      ); // full circle
-      ctx.stroke();
-
-      ctx.strokeStyle = team1 ? color.team2Player : color.team1Player;
-      ctx.beginPath();
-      ctx.arc(
-        ...killedPosition,
-        playerRadius - playerRadius / 2.5,
-        0,
-        Math.PI * 2
-      ); // full circle
-      ctx.stroke();
-    }
-  );
+  game.virtualServer.shots.forEach((shot) => animateShot(game, ctx, shot));
 };
 
 const newGameCanvas = (scale, mapWidth, mapHeight) => {

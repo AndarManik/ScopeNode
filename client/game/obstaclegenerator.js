@@ -6,14 +6,17 @@
 // 1. expanding edges outward by the circle radius
 // 2. approximating circle boundary at vertices
 
-export const generateObstacle = (game) => {
-  const randomAlpha = Math.random();
+export const generateObstacle = (
+  game,
+  position = [0, 0],
+  angle = Math.PI * 2 * Math.random(),
+  alpha = Math.random()
+) => {
   const area = (game.obstacleArea * game.playerRadius) ** 2;
   const minDeg = game.minObstacleDeg;
-  const triangle = spawnTriangleCentered(randomAlpha, area, minDeg);
+  const triangle = spawnTriangleCentered(alpha, area, minDeg);
 
-  const randomAngle = Math.PI * 2 * Math.random();
-  const rotatedTriangle = transformPoints([0, 0], randomAngle, triangle);
+  const rotatedTriangle = transformPoints(position, angle, triangle);
 
   const mTriangle = minkowskiSum(
     rotatedTriangle,
@@ -23,7 +26,7 @@ export const generateObstacle = (game) => {
   const mDoubleTriangle = minkowskiSum(
     rotatedTriangle,
     2 * game.playerRadius,
-    4 * game.minkowskiDeg
+    game.minkowskiDeg / 4
   );
   return {
     poly: rotatedTriangle,

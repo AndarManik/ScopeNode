@@ -1,4 +1,4 @@
-import { pushManyLightingObstacles } from "./lighting.js";
+import { pushLightingObstacle, pushManyLightingObstacles } from "./lighting.js";
 import { generateObstacle, transformPoints } from "./obstaclegenerator.js";
 import {
   setupObstacleBlockers,
@@ -44,6 +44,12 @@ export const initializeReceivedObstacles = (game, obstacles) => {
     pushPathingObstacle(game, obstacle);
   });
   pushManyLightingObstacles(game, game.obstacles);
+};
+
+export const addObstacle = (game, obstacle) => {
+  pushValidObstacle(game, obstacle);
+  pushPathingObstacle(game, obstacle);
+  pushLightingObstacle(game, obstacle);
 };
 
 const randomNormal = (a = Math.random(), b = Math.random()) =>

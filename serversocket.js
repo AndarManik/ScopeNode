@@ -62,7 +62,7 @@ const newMessageHandler = (lobbyServer, socket) => (msg, isBinary) => {
 
   // Binary is special cased to be as close to the socket.on"message" call
   if (isBinary) {
-    for (const player of socket.lobby?.connected || [])
+    for (const player of socket.lobby?.connected ?? [])
       if (player !== socket) player.send(msg);
     return;
   }
@@ -124,6 +124,15 @@ const newMessageHandler = (lobbyServer, socket) => (msg, isBinary) => {
 
     case "round end":
       return socket.lobby?.clientRoundEnded(socket);
+
+    case "preview obstacle":
+      return socket.lobby?.previewObstacle(socket, message);
+    
+    case "confirm obstacle":
+      return socket.lobby?.confirmObstacle(socket, message);
+
+    case "has confirmed obstacle":
+      return socket.lobby?.clientHasConfirmObstacle(socket);
 
     case "virtual server stopped":
       return socket.lobby?.virtualServerStopped(socket);

@@ -1,4 +1,4 @@
-export const pack = (uuidToInt, uuid, state) => {
+export const packState = (uuidToInt, uuid, state) => {
   const intid = uuidToInt[uuid];
   if (intid < 0 || intid > 255)
     throw new Error("intid not integer in [0, 255]");
@@ -195,7 +195,7 @@ export const pack = (uuidToInt, uuid, state) => {
   return compressed;
 };
 
-export const unpack = (intToUUID, buffer) => {
+export const unpackState = (intToUUID, buffer) => {
   const view = new DataView(decompress(buffer));
   let offset = 0;
 
@@ -286,6 +286,83 @@ export const unpack = (intToUUID, buffer) => {
       light,
       path,
     },
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Obstacle packing (index is int32, may be -1)
+// ---------------------------------------------------------------------------
+
+export const packObstacle = (obstacle) => {
+  if (!obstacle || typeof obstacle !== "object")
+    throw new Error("obstacle must be an object");
+
+  const pos = obstacle.position;
+  if (!Array.isArray(pos) || pos.length !== 2)
+    throw new Error("obstacle.position must be [x,y]");
+
+  const x = Number(pos[0]);
+  const y = Number(pos[1]);
+  if (!Number.isFinite(x) || !Number.isFinite(y))
+    throw new Error("obstacle.position coords must be finite numbers");
+
+  const angle = Number(obstacle.angle);
+  const alpha = Number(obstacle.alpha);
+  if (!Number.isFinite(angle)) throw new Error("obstacle.angle must be finite");
+  if (!Number.isFinite(alpha)) throw new Error("obstacle.alpha must be finite");
+
+  const index = obstacle.index;
+  if (!Number.isInteger(index))
+    throw new Error("obstacle.index must be an integer");
+  if (index < -2147483648 || index > 2147483647)
+    throw new Error("obstacle.index out of int32 range");
+
+  const buffer = new ArrayBuffer(28);
+  const view = new DataView(buffer);
+  let offset = 0;
+
+  view.setFloat32(offset, x, true);
+  offset += 4;
+  view.setFloat32(offset, y, true);
+  offset += 4;
+
+  view.setFloat64(offset, angle, true);
+  offset += 8;
+  view.setFloat64(offset, alpha, true);
+  offset += 8;
+
+  // int32 index (allows -1)
+  view.setInt32(offset, index | 0, true);
+  offset += 4;
+
+  return compress(buffer);
+};
+
+export const unpackObstacle = (buffer) => {
+  const view = new DataView(decompress(buffer));
+  if (view.byteLength !== 28) return;
+
+  let offset = 0;
+
+  const x = view.getFloat32(offset, true);
+  offset += 4;
+  const y = view.getFloat32(offset, true);
+  offset += 4;
+
+  const angle = view.getFloat64(offset, true);
+  offset += 8;
+  const alpha = view.getFloat64(offset, true);
+  offset += 8;
+
+  // int32 index (may be -1)
+  const index = view.getInt32(offset, true);
+  offset += 4;
+
+  return {
+    position: [x, y],
+    angle,
+    alpha,
+    index,
   };
 };
 

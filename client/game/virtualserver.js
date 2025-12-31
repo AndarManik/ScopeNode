@@ -1,4 +1,4 @@
-import { pack, unpack } from "./binary.js";
+import { packState, unpackState } from "./binary.js";
 import { registerHit } from "./hitreg.js";
 
 let count = 0;
@@ -32,7 +32,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
 
   // idempotent
   virtualServer.addState = (packedState) => {
-    const { uuid, state } = unpack(all, packedState);
+    const { uuid, state } = unpackState(all, packedState);
     if (globalDead.has(uuid)) return;
     const tick = state.tick[1];
     if (tick < processedTick) return;
@@ -111,7 +111,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
     if (!game.playerIsDead) localHistory.push(localState);
 
     if (!game.playerIsDead && game.isMultiPlayer)
-      socket.send(pack(allInv, game.userId, localState));
+      socket.send(packState(allInv, game.userId, localState));
 
     while (processHistory());
 
@@ -248,7 +248,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
             team1: true,
             killer: uuid1,
             killed: uuid2,
-            killerPosition: team1Player.position,
+            killerPosition: game.centerObjective,
             killedPosition: team2Player.position,
             hit: team2Player.position,
           });
@@ -266,7 +266,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
             team2: true,
             killer: uuid2,
             killed: uuid1,
-            killerPosition: team2Player.position,
+            killerPosition: game.centerObjective,
             killedPosition: team1Player.position,
             hit: team1Player.position,
           });
