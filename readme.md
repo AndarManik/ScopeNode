@@ -20,3 +20,5 @@ A round can be won in one of two ways:
 
 * Matches are played over multiple rounds.
 * The first team to win **N rounds** claims overall victory.
+
+<img width="1272" height="962" alt="image" src="https://github.com/user-attachments/assets/02daf289-0455-434f-b74a-7c4240089f85" />
