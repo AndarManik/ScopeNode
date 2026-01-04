@@ -244,7 +244,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
     let time = 0;
     for (const [_, state] of tickSlice) time += state.time;
     time /= tickSlice.length * 1000;
-    const timeAlpha = Math.max(0, (time - 15) / 30) ** 2;
+    const timeAlpha = Math.max(0, (time - 30) / 30) ** 3;
 
     const obstacleRadius =
       (1 - timeAlpha) * playerRadius +
@@ -260,7 +260,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
             team1: true,
             killer: uuid1,
             killed: uuid2,
-            killerPosition: game.centerObjective,
+            killerPosition: team1Player.position,
             killedPosition: team2Player.position,
             hit: team2Player.position,
           });
@@ -278,7 +278,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
             team2: true,
             killer: uuid2,
             killed: uuid1,
-            killerPosition: game.centerObjective,
+            killerPosition: team2Player.position,
             killedPosition: team1Player.position,
             hit: team1Player.position,
           });

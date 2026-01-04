@@ -5,7 +5,6 @@ import { newMenu } from "./menu.js";
 import { main } from "./menu/main.js";
 import { newGame } from "./game.js";
 import { newStats } from "./stats.js";
-//import "./gamealpha/alpha/client.js";
 
 const app = {};
 addUserSettings(app);

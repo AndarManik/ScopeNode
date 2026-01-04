@@ -241,19 +241,28 @@ export const render = (game, team1, team2) => {
 
   //draw objective
   const time = (performance.now() - game.virtualServer.startTime) / 1000;
-  const timeAlpha = Math.max(0, (time - 15) / 30) ** 2;
+  const timeAlpha = Math.max(0, (time - 30) / 30) ** 3; // 3 second count in
+  const timeBeta = 1 - timeAlpha;
   const obstacleRadius =
-    (1 - timeAlpha) * playerRadius +
-    timeAlpha * Math.hypot(mapWidth, mapHeight);
+    timeBeta * playerRadius + timeAlpha * Math.hypot(mapWidth, mapHeight);
 
-  ctx.save();
-  ctx.globalAlpha = 0.25 + (3 * (1 - timeAlpha)) / 4;
-
-  ctx.fillStyle = color.centerObjective;
-  ctx.beginPath();
-  ctx.arc(...game.centerObjective, obstacleRadius, 0, Math.PI * 2); // full circle
-  ctx.fill();
-  ctx.restore();
+  if (obstacleRadius === playerRadius) {
+    ctx.fillStyle = color.centerObjective;
+    ctx.beginPath();
+    ctx.arc(...game.centerObjective, playerRadius, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.lineWidth = playerRadius * 2;
+    ctx.strokeStyle = color.centerObjective;
+    ctx.beginPath();
+    ctx.arc(
+      ...game.centerObjective,
+      obstacleRadius - playerRadius,
+      0,
+      Math.PI * 2
+    ); // full circle
+    ctx.stroke();
+  }
 
   // render shot
   const s = game.scale;
