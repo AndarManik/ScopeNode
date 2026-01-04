@@ -6,8 +6,8 @@
 
 A round can be won in one of two ways:
 
-* **Elimination Victory** — Destroy all opposing players.
-* **Objective Victory** — Be the first team to reach and touch the **central orb**.
+* **Elimination Victory** - Destroy all opposing players.
+* **Objective Victory** - Be the first team to reach and touch the **central orb**.
 
 ## **Arena**
 
@@ -20,5 +20,12 @@ A round can be won in one of two ways:
 
 * Matches are played over multiple rounds.
 * The first team to win **N rounds** claims overall victory.
+
+## **Interface**
+
+Regions on the map will be highlighted different colors depending on the state of the position.
+
+* **Safe Zone** - The region seen by your team
+* **Blind Spot** - The region that can see someone on your team but cannot be seen by your team
 
 <img width="1272" height="962" alt="image" src="https://github.com/user-attachments/assets/02daf289-0455-434f-b74a-7c4240089f85" />
