@@ -24,10 +24,9 @@ export const newColor = (app) => {
     const hue = color.hue;
     color.background = `oklch(0.09 0.015 ${hue + 60})`;
 
-    color.team1Player = `oklch(0.82 0.100 ${hue + 45})`;
-    color.team2Player = `oklch(0.82 0.100 ${hue - 45})`;
-
-    color.centerObjective = `oklch(0.82 0.100 ${hue})`;
+    color.team1Player = `oklch(0.82 0.088 ${hue + 45})`;
+    color.team2Player = `oklch(0.82 0.088 ${hue - 45})`;
+    color.centerObjective = `oklch(0.82 0.088 ${hue})`;
 
     color.team1Path = `oklch(0.90 0.018 ${hue + 45})`;
     color.team2Path = `oklch(0.90 0.018 ${hue - 45})`;
@@ -42,8 +41,11 @@ export const newColor = (app) => {
     color.team2Disk = `oklch(0.75 0.125 ${hue - 45})`;
     color.intersectDisk = `oklch(0.86 0.065 ${hue})`;
 
-    color.team1Bullet = `oklch(0.90 0.045 ${hue + 60})`;
-    color.team2Bullet = `oklch(0.90 0.045 ${hue - 60})`;
+    color.team1Bullet = `oklch(0.90 0.045 ${hue + 45})`;
+    color.team2Bullet = `oklch(0.90 0.045 ${hue - 45})`;
+
+    color.team1Gun = `oklch(0.65 0.110 ${hue + 60})`;
+    color.team2Gun = `oklch(0.65 0.110 ${hue - 60})`;
   };
 
   color.setUIByHue = () => {

@@ -1,8 +1,10 @@
+import { packObstacle, unpackObstacle } from "./binary.js";
 import { pushLightingObstacle, pushManyLightingObstacles } from "./lighting.js";
 import { generateObstacle, transformPoints } from "./obstaclegenerator.js";
 import {
   setupObstacleBlockers,
   pushValidObstacle,
+  validateNewObstacle,
 } from "./obstaclevalidator.js";
 import { pushPathingObstacle } from "./pathing.js";
 
@@ -50,6 +52,60 @@ export const addObstacle = (game, obstacle) => {
   pushValidObstacle(game, obstacle);
   pushPathingObstacle(game, obstacle);
   pushLightingObstacle(game, obstacle);
+};
+
+export const newObstaclePreview = (game, socket) => {
+  game.previewObstacle = generateObstacle(
+    game,
+    game.mouse,
+    game.previewAngle,
+    game.previewAlpha
+  );
+
+  game.previewObstacle.index = validateNewObstacle(game, game.previewObstacle);
+
+  if (game.mouse.isClicking && game.previewObstacle.index !== -1) {
+    game.choosingObstacle = false;
+    addObstacle(game, game.previewObstacle);
+    socket.json({
+      command: "confirm obstacle",
+      position: game.mouse,
+      angle: game.previewAngle,
+      alpha: game.previewAlpha,
+    });
+  } else {
+    socket.send(
+      packObstacle({
+        position: game.mouse,
+        angle: game.previewAngle,
+        alpha: game.previewAlpha,
+        index: game.previewObstacle.index,
+      })
+    );
+  }
+};
+
+export const receivePreviewObstacle = (game, data) => {
+  const obstacle = unpackObstacle(data);
+  if (!obstacle) return false;
+  game.previewObstacle = generateObstacle(
+    game,
+    obstacle.position,
+    obstacle.angle,
+    obstacle.alpha
+  );
+  game.previewObstacle.index = obstacle.index;
+  return true;
+};
+
+export const confirmPreviewObstacle = (game, obstacle) => {
+  game.previewObstacle = generateObstacle(
+    game,
+    obstacle.position,
+    obstacle.angle,
+    obstacle.alpha
+  );
+  addObstacle(game, game.previewObstacle);
 };
 
 const randomNormal = (a = Math.random(), b = Math.random()) =>

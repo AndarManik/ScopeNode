@@ -126,3 +126,99 @@ function segmentCircleFirstIntersection(ax, ay, bx, by, cx, cy, r, r2) {
 
   return null;
 }
+
+export function registerTarget(shooter, enemies, radius) {
+  // who is the shooter closest to shooting.
+  let bodyDist = Infinity;
+  let bodyPoint = null;
+  let bestEnemy = null;
+  for (const enemy of enemies) {
+    const { point, dist2 } = closestPointToBodyUnion(...shooter[2], enemy[1]);
+    if (dist2 < bodyDist) {
+      bestEnemy = enemy;
+      bodyDist = dist2;
+      bodyPoint = point;
+    }
+  }
+  if (!bestEnemy) return [null, false];
+  const target = closestPointToClosedPolygon(...bestEnemy[2], shooter[0]).point;
+  const pointDist = closestPointToClosedPolygon(
+    ...bodyPoint,
+    bestEnemy[0]
+  ).dist2;
+  const advantage = Math.sqrt(pointDist) > radius;
+  return [target, advantage];
+}
+
+/** Closest point to union of bodyPolys (min over polys). */
+function closestPointToBodyUnion(px, py, bodyPolys) {
+  let bestPoint = null;
+  let bestD2 = Infinity;
+
+  for (let i = 0; i < bodyPolys.length; i++) {
+    const poly = bodyPolys[i];
+    if (!poly || poly.length < 4) continue;
+
+    const { point, dist2 } = closestPointToClosedPolygon(px, py, poly);
+    if (dist2 < bestD2) {
+      bestD2 = dist2;
+      bestPoint = point;
+      if (bestD2 === 0) break;
+    }
+  }
+
+  return { point: bestPoint, dist2: bestD2 };
+}
+
+/**
+ * Returns the closest point on/in a CLOSED polygon to point P.
+ * If P is inside/on boundary => { point: P, dist2: 0 }
+ * else => closest point on boundary segments.
+ */
+function closestPointToClosedPolygon(px, py, poly) {
+  if (pointInClosedPolygonInclusive(px, py, poly)) {
+    return { point: [px, py], dist2: 0 };
+  }
+
+  let bestX = 0,
+    bestY = 0;
+  let bestD2 = Infinity;
+
+  for (let i = 0; i < poly.length - 1; i++) {
+    const ax = +poly[i][0],
+      ay = +poly[i][1];
+    const bx = +poly[i + 1][0],
+      by = +poly[i + 1][1];
+
+    const q = closestPointOnSegment(px, py, ax, ay, bx, by);
+    const dx = q[0] - px;
+    const dy = q[1] - py;
+    const d2 = dx * dx + dy * dy;
+
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      bestX = q[0];
+      bestY = q[1];
+      if (bestD2 === 0) break;
+    }
+  }
+
+  return { point: [bestX, bestY], dist2: bestD2 };
+}
+
+function closestPointOnSegment(px, py, ax, ay, bx, by) {
+  const abx = bx - ax;
+  const aby = by - ay;
+
+  const apx = px - ax;
+  const apy = py - ay;
+
+  const ab2 = abx * abx + aby * aby;
+  if (ab2 === 0) return [ax, ay];
+
+  let t = (apx * abx + apy * aby) / ab2;
+  if (t < 0) t = 0;
+  else if (t > 1) t = 1;
+
+  return [ax + t * abx, ay + t * aby];
+}

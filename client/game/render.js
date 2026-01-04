@@ -1,13 +1,14 @@
+import { createBulletWarpPostFX } from "./bulletwarp.js";
 import { createTeamsVisionRenderer } from "./lightrendering.js";
-import { animateShot, drawShell } from "./shootanimation.js";
+import { animateShot } from "./shootanimation.js";
 
 export const render = (game, team1, team2) => {
   const { renderSettings, color, mapWidth, mapHeight, playerRadius } = game;
-  if (game.scale !== renderSettings.scale) {
-    game.scale = renderSettings.scale;
-    game.canvas = newGameCanvas(game.scale, mapWidth, mapHeight);
+  if (game.scale !== renderSettings.scale || !game.sceneCtx || !game.warpFX) {
+    newGameCanvases(game, renderSettings.scale, mapWidth, mapHeight);
+
     game.lightRenderer = createTeamsVisionRenderer(
-      game.canvas.ctx,
+      game.sceneCtx,
       mapWidth,
       mapHeight,
       game.scale
@@ -15,7 +16,7 @@ export const render = (game, team1, team2) => {
   }
 
   // canvas might change underneath so you can't take this out of render
-  const ctx = game.canvas.ctx;
+  const ctx = game.sceneCtx;
 
   // clear screen
   ctx.fillStyle = color.background;
@@ -56,7 +57,7 @@ export const render = (game, team1, team2) => {
     ctx.fill("nonzero");
 
     ctx.save();
-    ctx.globalAlpha = 0.3;
+    ctx.globalAlpha = 0.5;
     ctx.beginPath();
     const { previewPoly } = game.previewObstacle;
     ctx.moveTo(previewPoly[0][0], previewPoly[0][1]);
@@ -103,32 +104,19 @@ export const render = (game, team1, team2) => {
       }
     );
 
+    game.warpFX.render({
+      pointsPx: [],
+    });
     return;
   }
 
   // draw team lights
   if (game.lightGraph) {
-    const team1Lights = [...game.virtualServer.globalStates.entries()]
-      .filter(([uuid]) => team1.has(uuid))
-      .map(([_, state]) => {
-        if (!state.interp) return state.light;
-        else return game.lightGraph.shineAt(state.iPosition);
-      });
-
-    const team2Lights = [...game.virtualServer.globalStates.entries()]
-      .filter(([uuid]) => team2.has(uuid))
-      .map(([_, state]) => {
-        if (!state.interp) return state.light;
-        else return game.lightGraph.shineAt(state.iPosition);
-      });
-
-    if (!game.playerIsDead) {
-      game.playerLight = game.lightGraph.shineAt(game.playerPosition);
-      if (game.isTeam1) team1Lights.push(game.playerLight);
-      else team2Lights.push(game.playerLight);
-    }
-
-    game.lightRenderer(team1Lights, team2Lights, color);
+    game.lightRenderer(
+      [...game.team1Lights.values()],
+      [...game.team2Lights.values()],
+      color
+    );
   }
 
   // mouse position
@@ -205,52 +193,208 @@ export const render = (game, team1, team2) => {
     ctx.restore();
 
     // draw player
-    ctx.lineWidth = (2 * playerRadius) / 2.5;
+    const target = game.playerTarget?.[0] || game.path[1] || game.mouse;
+    const hasAdvantage = game.playerTarget?.[1] ?? false;
+    // Base colors
+    const playerColor = game.isTeam1 ? color.team1Player : color.team2Player;
+    const gunColorNormal = game.isTeam1 ? color.team2Gun : color.team1Gun;
+    const gunColorSwapped = game.isTeam1 ? color.team1Gun : color.team2Gun;
+    // Swap gun color only when NO advantage
+    const gunColor = hasAdvantage ? gunColorNormal : gunColorSwapped;
+    drawPlayer(
+      ctx,
+      game.playerPosition,
+      playerRadius,
+      playerColor,
+      gunColor,
+      Math.atan2(
+        target[1] - game.playerPosition[1],
+        target[0] - game.playerPosition[0]
+      )
+    );
+  }
 
-    ctx.strokeStyle = game.isTeam1 ? color.team1Player : color.team2Player;
-    ctx.beginPath();
-    ctx.arc(
-      ...game.playerPosition,
-      playerRadius - playerRadius / 2.5,
-      0,
-      Math.PI * 2
-    ); // full circle
-    ctx.stroke();
+  for (const [uuid, state] of game.virtualServer.globalStates.entries()) {
+    const isTeam1 = team1.has(uuid);
+
+    // Target + advantage (same semantics as local player)
+    const target = state.target?.[0] || state.iPath[1] || state.iPosition;
+    const hasAdvantage = state.target?.[1] ?? false;
+
+    // Base colors
+    const playerColor = isTeam1 ? color.team1Player : color.team2Player;
+    const gunColorNormal = isTeam1 ? color.team2Gun : color.team1Gun;
+    const gunColorSwapped = isTeam1 ? color.team1Gun : color.team2Gun;
+
+    // Swap gun color only when NO advantage
+    const gunColor = hasAdvantage ? gunColorNormal : gunColorSwapped;
+
+    drawPlayer(
+      ctx,
+      state.iPosition,
+      playerRadius,
+      playerColor,
+      gunColor,
+      Math.atan2(target[1] - state.iPosition[1], target[0] - state.iPosition[0])
+    );
   }
 
   //draw objective
+  const time = (performance.now() - game.virtualServer.startTime) / 1000;
+  const timeAlpha = Math.max(0, (time - 15) / 30) ** 2;
+  const obstacleRadius =
+    (1 - timeAlpha) * playerRadius +
+    timeAlpha * Math.hypot(mapWidth, mapHeight);
+
+  ctx.save();
+  ctx.globalAlpha = 0.25 + (3 * (1 - timeAlpha)) / 4;
+
   ctx.fillStyle = color.centerObjective;
   ctx.beginPath();
-  ctx.arc(...game.centerObjective, playerRadius, 0, Math.PI * 2); // full circle
+  ctx.arc(...game.centerObjective, obstacleRadius, 0, Math.PI * 2); // full circle
   ctx.fill();
-
-  ctx.lineWidth = (2 * playerRadius) / 2.5;
-
-  for (const [uuid, state] of game.virtualServer.globalStates.entries()) {
-    // draw global players
-    ctx.strokeStyle = team1.has(uuid) ? color.team1Player : color.team2Player;
-    ctx.beginPath();
-    ctx.arc(
-      ...(state.iPosition || state.position),
-      playerRadius - playerRadius / 2.5,
-      0,
-      Math.PI * 2
-    ); // full circle
-    ctx.stroke();
-  }
+  ctx.restore();
 
   // render shot
-  game.virtualServer.shots.forEach((shot) => animateShot(game, ctx, shot));
+  const s = game.scale;
+  const bullets = [];
+  [...game.virtualServer.shots].forEach((shot) => {
+    const bullet = animateShot(game, ctx, shot, s);
+    if (bullet) bullets.push(bullet[1]);
+  });
+
+  // --- Post-process warp to ON-SCREEN WebGL canvas ---
+  game.warpFX.render({
+    pointsPx: bullets,
+    ampPx: 0.25 * playerRadius * s, // tune: pixels
+    sigmaPx: 100 * playerRadius * s, // tune: pixels
+  });
 };
 
-const newGameCanvas = (scale, mapWidth, mapHeight) => {
-  const canvas = document.getElementById("Game");
-  const ctx = canvas.getContext("2d");
+const newGameCanvases = (game, scale, mapWidth, mapHeight) => {
+  // On-screen output canvas is still #Game, but it becomes WebGL.
+  const output = document.getElementById("Game");
+  output.width = mapWidth * scale;
+  output.height = mapHeight * scale;
+
+  // Offscreen scene canvas: 2D, scaled like your current setup
+  const scene = document.createElement("canvas");
+  scene.width = mapWidth * scale;
+  scene.height = mapHeight * scale;
+
+  const ctx = scene.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   ctx.imageSmoothingQuality = "low";
-  canvas.width = mapWidth * scale;
-  canvas.height = mapHeight * scale;
-  canvas.ctx = ctx;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(scale, scale);
-  return canvas;
+
+  // Build warp FX (post-process)
+  const warpFX = createBulletWarpPostFX({
+    sourceCanvas: scene,
+    outputCanvas: output,
+    maxPoints: 32,
+  });
+
+  game.sceneCanvas = scene;
+  game.sceneCtx = ctx;
+  game.outputCanvas = output;
+  game.warpFX = warpFX;
+  game.scale = scale;
+
+  return { scene, ctx, output };
+};
+
+export const drawPlayer = (
+  ctx,
+  [cx, cy],
+  playerRadius,
+  color,
+  gun,
+  angle = 0,
+  sliceFrac = 0.2
+) => {
+  // Background (gun)
+  ctx.fillStyle = gun;
+  ctx.beginPath();
+  ctx.arc(cx, cy, playerRadius, 0, 2 * Math.PI);
+  ctx.fill();
+
+  // Clamp
+  sliceFrac = Math.max(0, Math.min(1, sliceFrac));
+
+  const r = playerRadius;
+
+  // Half-thickness of removed strip in local coordinates (diameter = 2r)
+  const w = sliceFrac * r;
+
+  // If no cut -> full circle body + outline
+  if (w <= 0) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Curvy bit (rotated)
+    const strokeR = r - r / 2.5;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.lineWidth = (2 * r) / 2.5;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, strokeR, Math.PI / 2, (3 * Math.PI) / 2);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  // If cut removes everything -> draw nothing (gun already drawn)
+  if (w >= r) return;
+
+  // In local frame where removed strip is -w <= y <= w:
+  // Circle intersections with y = ±w occur at x = ±sqrt(r^2 - w^2)
+  const x = Math.sqrt(r * r - w * w);
+
+  // Angle to intersection point on circle: sin(alpha) = w / r
+  const alpha = Math.asin(w / r);
+
+  // Body fill (two caps) in rotated local frame
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  ctx.fillStyle = color;
+
+  // 1) Top cap (y >= +w)
+  ctx.beginPath();
+  ctx.arc(0, 0, r, alpha, Math.PI - alpha, false); // CCW
+  ctx.lineTo(x, w);
+  ctx.closePath();
+  ctx.fill();
+
+  // 2) Bottom cap (y <= -w)
+  ctx.beginPath();
+  ctx.arc(0, 0, r, Math.PI + alpha, 2 * Math.PI - alpha, false); // CCW
+  ctx.lineTo(-x, -w);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+
+  // ----------------------------------------------------
+  // Curvy bit (rotated with angle) — draws left semicircle
+  // ----------------------------------------------------
+  const strokeR = r - r * 2 * sliceFrac;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  ctx.lineWidth = 4 * r * sliceFrac;
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.arc(0, 0, strokeR, Math.PI / 2, (3 * Math.PI) / 2); // left half in local frame
+  ctx.stroke();
+
+  ctx.restore();
 };

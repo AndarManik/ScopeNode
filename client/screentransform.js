@@ -1,17 +1,37 @@
+// DROP-IN: paste this whole block (replaces your current code)
+
 const app = document.getElementById("App");
 
-const maxTilt = 0.5; // degrees — how much max tilt you want
+const maxTilt = 0.5; // degrees — mouse-driven tilt cap
 let currentTiltX = 0;
 let currentTiltY = 0;
 let targetTiltX = 0;
 let targetTiltY = 0;
+
 let jiggleX = 0;
 let jiggleY = 0;
-export function jiggleApp(duration = 333, magnitude = 4) {
+
+// NEW: jiggle tilt (additive, like jab)
+let jiggleTiltX = 0; // degrees
+let jiggleTiltY = 0; // degrees
+
+// per-frame accumulated jab translation + jab tilt
+let jabX = 0;
+let jabY = 0;
+let jabTiltX = 0;
+let jabTiltY = 0;
+
+export function jiggleApp(
+  duration = 500,
+  magnitude = 4,
+  tiltMagnitude = 0.6 // NEW: degrees
+) {
   const start = performance.now();
   const seed = Math.random() * 1000;
+
   const noise = (t) =>
-    Math.sin(t + seed) * 0.5 + Math.sin(t * 1.7 + seed) * 0.3;
+    Math.sin(t + seed) * 0.5 + Math.sin(t * 1.7 + seed * 2.3) * 0.3;
+
   const frame = (time) => {
     const t = (time - start) / duration;
     if (t >= 1) {
@@ -19,28 +39,77 @@ export function jiggleApp(duration = 333, magnitude = 4) {
       jiggleY = 0;
       return;
     }
+
     const decay = (1 - t) ** 3;
-    const x = noise(t * 22) * magnitude * decay;
-    const y = noise(t * 22 + seed) * magnitude * decay;
-    jiggleX = x;
-    jiggleY = y;
+
+    const nx = noise(t * 22);
+    const ny = noise(t * 22 + 10);
+
+    // Translation
+    jiggleX = nx * magnitude * decay;
+    jiggleY = ny * magnitude * decay;
+
+    // Tilt (mirrors jab axis conventions)
+    jiggleTiltY += nx * tiltMagnitude * decay;
+    jiggleTiltX += -ny * tiltMagnitude * decay;
+
     requestAnimationFrame(frame);
   };
+
   requestAnimationFrame(frame);
 }
 
-// helper clamp
+// Directional jab (unchanged)
+export function jabApp(
+  direction,
+  duration = 1000,
+  magnitude = 20,
+  tiltMagnitude = 3
+) {
+  const start = performance.now();
+
+  let dx = -direction?.[0] ?? 0;
+  let dy = -direction?.[1] ?? 0;
+
+  const len = Math.hypot(dx, dy);
+  if (len > 1e-9) {
+    dx /= len;
+    dy /= len;
+  } else return;
+
+  const impulse = (t) => Math.exp(-6 * t) * Math.sin(Math.PI * t);
+
+  const frame = (now) => {
+    const t = (now - start) / duration;
+    if (t >= 1) return;
+
+    const k = impulse(t);
+
+    const px = k * magnitude;
+    jabX += dx * px;
+    jabY += dy * px;
+
+    const deg = k * tiltMagnitude;
+    jabTiltY += dx * deg;
+    jabTiltX += -dy * deg;
+
+    requestAnimationFrame(frame);
+  };
+
+  requestAnimationFrame(frame);
+}
+
 const clamp = (v, min, max) => (v < min ? min : v > max ? max : v);
 
 window.addEventListener("mousemove", (e) => {
   const rect = app.getBoundingClientRect();
 
-  const localX = e.clientX - rect.left;
-  const localY = e.clientY - rect.top;
-  let nx = (localX / rect.width) * 2 - 1;
-  let ny = (localY / rect.height) * 2 - 1;
+  let nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  let ny = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+
   nx = clamp(nx, -1, 1);
   ny = clamp(ny, -1, 1);
+
   targetTiltX = -(ny * maxTilt);
   targetTiltY = nx * maxTilt;
 });
@@ -51,7 +120,7 @@ const LAMBDA = -Math.log(1 - 0.12) * 200;
 let lastTime = performance.now();
 
 function render(now) {
-  const dt = (now - lastTime) / 1000; // seconds since last frame
+  const dt = (now - lastTime) / 1000;
   lastTime = now;
 
   const lerp = 1 - Math.exp(-LAMBDA * dt);
@@ -61,10 +130,15 @@ function render(now) {
 
   app.style.transform = `
     perspective(600px)
-    translate3d(${jiggleX}px, ${jiggleY}px, 0)
-    rotateX(${currentTiltX}deg)
-    rotateY(${currentTiltY}deg)
+    translate3d(${jiggleX + jabX}px, ${jiggleY + jabY}px, 0)
+    rotateX(${currentTiltX + jiggleTiltX + jabTiltX}deg)
+    rotateY(${currentTiltY + jiggleTiltY + jabTiltY}deg)
   `;
+
+  // reset additive impulses
+  jabX = jabY = 0;
+  jabTiltX = jabTiltY = 0;
+  jiggleTiltX = jiggleTiltY = 0;
 
   requestAnimationFrame(render);
 }

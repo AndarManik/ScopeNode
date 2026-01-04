@@ -4,6 +4,7 @@ export const packState = (uuidToInt, uuid, state) => {
     throw new Error("intid not integer in [0, 255]");
 
   const [startTick, endTick] = state.tick;
+  const time = Number(state.time ?? 0); // NEW
   const [x, y] = state.position;
   const vector = state.vector || [];
 
@@ -15,6 +16,9 @@ export const packState = (uuidToInt, uuid, state) => {
     throw new Error("startTick out of int32 range");
   if (endTick < -2147483648 || endTick > 2147483647)
     throw new Error("endTick out of int32 range");
+
+  // NEW: time validation (float)
+  if (!Number.isFinite(time)) throw new Error("time must be a finite number");
 
   const vectorLength = vector.length;
   if (vectorLength < 0) throw new Error("vector length must be >= 0");
@@ -87,8 +91,8 @@ export const packState = (uuidToInt, uuid, state) => {
   // per-vector entry: uuidInt (uint8) + tick (int32)
   const entrySize = 1 + 4;
 
-  // intid + startTick(i32) + endTick(i32) + x(f32) + y(f32) + vectorLength(u8)
-  const headerSize = 1 + 4 + 4 + 4 + 4 + 1;
+  // intid + startTick(i32) + endTick(i32) + time(f32) + x(f32) + y(f32) + vectorLength(u8)
+  const headerSize = 1 + 4 + 4 + 4 + 4 + 4 + 1; // NEW: +4 for time
 
   // light encoding size:
   // lightOuterCount (u32) +
@@ -119,6 +123,10 @@ export const packState = (uuidToInt, uuid, state) => {
   view.setInt32(offset, startTick | 0, true);
   offset += 4;
   view.setInt32(offset, endTick | 0, true);
+  offset += 4;
+
+  // NEW: time (float32)
+  view.setFloat32(offset, time, true);
   offset += 4;
 
   // position (float32)
@@ -191,7 +199,6 @@ export const packState = (uuidToInt, uuid, state) => {
   }
 
   const compressed = compress(buffer);
-
   return compressed;
 };
 
@@ -206,6 +213,10 @@ export const unpackState = (intToUUID, buffer) => {
   const startTick = view.getInt32(offset, true);
   offset += 4;
   const endTick = view.getInt32(offset, true);
+  offset += 4;
+
+  // NEW: time (float32)
+  const time = view.getFloat32(offset, true);
   offset += 4;
 
   // position (float32)
@@ -281,6 +292,7 @@ export const unpackState = (intToUUID, buffer) => {
     uuid,
     state: {
       tick: [startTick, endTick],
+      time,
       position: [x, y],
       vector,
       light,

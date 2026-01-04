@@ -11,34 +11,44 @@ export const pushPathingObstacle = (game, obstacle) => {
 
 export const planPath = (game, source, target) => {
   if (!game.kickoutParams) return [];
+
   let targetPath = [];
+
   source = kickout(source, game.kickoutParams);
   target = kickout(target, game.kickoutParams);
+
   if (game.apsp && !game.pathGraph._visibleFromPointToPoint(source, target)) {
     const sourceVerts = game.pathGraph.visibleIndicesAt(source);
     const targetVerts = game.pathGraph.visibleIndicesAt(target);
-
     const vertices = game.pathGraph.vertices;
+
     let minDistance = Number.MAX_VALUE;
+
     for (const sIdx of sourceVerts) {
-      const sDist = Math.hypot(
-        vertices[sIdx][0] - source[0],
-        vertices[sIdx][1] - source[1]
-      );
+      const sx = vertices[sIdx][0] - source[0];
+      const sy = vertices[sIdx][1] - source[1];
+      const sDist = Math.sqrt(sx * sx + sy * sy);
+
+      if (sDist >= minDistance) continue;
+
       for (const tIdx of targetVerts) {
+        const tx = vertices[tIdx][0] - target[0];
+        const ty = vertices[tIdx][1] - target[1];
+        const tDist = Math.sqrt(tx * tx + ty * ty);
+
+        if (sDist + tDist > minDistance) continue;
+
         const res = game.apsp(sIdx, tIdx);
-        const tDist = Math.hypot(
-          vertices[tIdx][0] - target[0],
-          vertices[tIdx][1] - target[1]
-        );
         const total = sDist + tDist + res.distance;
+
         if (total < minDistance) {
-          targetPath = res.path;
           minDistance = total;
+          targetPath = res.path;
         }
       }
     }
   }
+
   return [source, ...targetPath, target];
 };
 

@@ -100,12 +100,15 @@ export const newVirtualServer = (game, app, team1, team2) => {
     for (const [uuid, { tick }] of globalStates.entries())
       vector.push([uuid, tick[0]]);
 
+    const time = performance.now() - virtualServer.startTime;
+
     const localState = {
       tick: [startTick, tick],
       vector,
       position: [...game.playerPosition],
       path: game.preRound ? [] : game.path,
-      light: game.playerLight,
+      light: [game.playerLight[0], game.playerLight[1]],
+      time,
     };
 
     if (!game.playerIsDead) localHistory.push(localState);
@@ -238,11 +241,20 @@ export const newVirtualServer = (game, app, team1, team2) => {
       }
     }
 
+    let time = 0;
+    for (const [_, state] of tickSlice) time += state.time;
+    time /= tickSlice.length * 1000;
+    const timeAlpha = Math.max(0, (time - 15) / 30) ** 2;
+
+    const obstacleRadius =
+      (1 - timeAlpha) * playerRadius +
+      timeAlpha * Math.hypot(game.mapWidth, game.mapHeight);
+
     for (const [uuid1, team1Player] of team1States) {
       const dx = team1Player.position[0] - game.centerObjective[0];
       const dy = team1Player.position[1] - game.centerObjective[1];
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 2 * playerRadius) {
+      const dist = Math.sqrt(dx * dx + dy * dy) - playerRadius;
+      if (dist < obstacleRadius) {
         for (const [uuid2, team2Player] of team2States) {
           newShots.push({
             team1: true,
@@ -259,8 +271,8 @@ export const newVirtualServer = (game, app, team1, team2) => {
     for (const [uuid2, team2Player] of team2States) {
       const dx = team2Player.position[0] - game.centerObjective[0];
       const dy = team2Player.position[1] - game.centerObjective[1];
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 2 * playerRadius) {
+      const dist = Math.sqrt(dx * dx + dy * dy) - playerRadius;
+      if (dist < obstacleRadius) {
         for (const [uuid1, team1Player] of team1States) {
           newShots.push({
             team2: true,
@@ -298,6 +310,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
   };
 
   virtualServer.start = () => {
+    virtualServer.startTime = performance.now();
     nextTick();
   };
 

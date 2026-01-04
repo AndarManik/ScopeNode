@@ -146,9 +146,10 @@ export const newLobby = (code) => {
       const killer = getInSocketSet(connected, shot.killer);
       const killed = getInSocketSet(connected, shot.killed);
       if (!killer || !killed) return;
-      if (killed.isDead) return;
-      killed.isDead = true;
-      killer.kills++;
+      if (!killed.isDead) {
+        killed.isDead = true;
+        killer.kills++;
+      }
     }
 
     const team1Alive = [...team1].filter(({ isDead }) => !isDead).length;

@@ -1,668 +1,428 @@
-```html
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Card DSL – Syntax Highlighting (Vertical Slice)</title>
+    <title>WebGL Mouse Warp Demo (Fixed Y + Stronger Warp)</title>
     <style>
-      :root {
-        --bg: #0b0f16;
-        --panel: #0f1623;
-        --panel2: #0b1220;
-        --border: rgba(255, 255, 255, 0.10);
-        --text: rgba(255, 255, 255, 0.88);
-        --muted: rgba(255, 255, 255, 0.55);
-
-        --kw: #7dd3fc; /* keywords */
-        --evt: #a78bfa; /* events */
-        --type: #34d399; /* types */
-        --lit: #fbbf24; /* string literal */
-        --num: #f87171; /* numbers */
-        --ref: #93c5fd; /* builtin refs (caster/opponent/this card/that monster) */
-        --prop: #f472b6; /* possessions: X's */
-        --op: #fda4af; /* operators: is, increases by, decreases by */
-        --fn: #60a5fa; /* builtins: deal/heal/draw/move/adds */
-        --dim: rgba(255, 255, 255, 0.30);
-      }
-
-      * {
-        box-sizing: border-box;
-      }
+      html,
       body {
         margin: 0;
+        height: 100%;
+        background: #0b0f14;
+        overflow: hidden;
         font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
           Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-        background: radial-gradient(
-            1200px 800px at 30% -20%,
-            rgba(124, 58, 237, 0.25),
-            transparent 60%
-          ),
-          radial-gradient(
-            1000px 700px at 90% 10%,
-            rgba(59, 130, 246, 0.18),
-            transparent 55%
-          ),
-          var(--bg);
-        color: var(--text);
       }
-
-      header {
-        padding: 18px 18px 10px;
-        border-bottom: 1px solid var(--border);
-        background: linear-gradient(
-          to bottom,
-          rgba(255, 255, 255, 0.02),
-          transparent
-        );
+      #wrap {
+        position: fixed;
+        inset: 0;
       }
-      header h1 {
-        margin: 0;
-        font-size: 16px;
-        letter-spacing: 0.2px;
-        font-weight: 650;
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
       }
-      header p {
-        margin: 6px 0 0;
-        font-size: 12px;
-        color: var(--muted);
-        line-height: 1.4;
-        max-width: 980px;
-      }
-
-      .wrap {
-        display: grid;
-        grid-template-columns: 360px 1fr;
-        gap: 14px;
-        padding: 14px;
-        max-width: 1300px;
-        margin: 0 auto;
-      }
-      @media (max-width: 980px) {
-        .wrap {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .panel {
-        background: linear-gradient(
-          to bottom right,
-          rgba(255, 255, 255, 0.035),
-          rgba(255, 255, 255, 0.015)
-        );
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        overflow: hidden;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-      }
-      .panel .topbar {
-        display: flex;
-        align-items: center;
-        gap: 10px;
+      #hud {
+        position: absolute;
+        left: 12px;
+        top: 12px;
         padding: 10px 12px;
-        border-bottom: 1px solid var(--border);
-        background: rgba(0, 0, 0, 0.16);
-      }
-      .panel .topbar .title {
-        font-size: 12px;
-        color: var(--muted);
-        user-select: none;
-      }
-      .panel .topbar .spacer {
-        flex: 1;
-      }
-      button {
-        border: 1px solid var(--border);
-        background: rgba(255, 255, 255, 0.04);
-        color: var(--text);
-        padding: 6px 10px;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 10px;
-        font-size: 12px;
-        cursor: pointer;
-      }
-      button:hover {
-        background: rgba(255, 255, 255, 0.07);
-      }
-
-      .list {
-        padding: 10px;
-        display: grid;
-        gap: 10px;
-      }
-
-      .cardButton {
-        width: 100%;
-        text-align: left;
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        background: rgba(0, 0, 0, 0.18);
-        cursor: pointer;
-      }
-      .cardButton:hover {
-        background: rgba(0, 0, 0, 0.26);
-      }
-      .cardButton.active {
-        border-color: rgba(124, 58, 237, 0.55);
-        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.25);
-        background: rgba(124, 58, 237, 0.08);
-      }
-      .cardButton .name {
-        font-size: 13px;
-        font-weight: 650;
-        margin: 0;
-      }
-      .cardButton .meta {
-        margin: 4px 0 0;
-        font-size: 11px;
-        color: var(--muted);
-      }
-
-      .editor {
-        display: grid;
-        grid-template-rows: auto 1fr;
-        min-height: 520px;
-      }
-
-      .editor .split {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0;
-        min-height: 520px;
-      }
-      @media (max-width: 980px) {
-        .editor .split {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .pane {
-        border-right: 1px solid var(--border);
-      }
-      .pane:last-child {
-        border-right: none;
-      }
-
-      .paneHeader {
-        padding: 10px 12px;
-        border-bottom: 1px solid var(--border);
-        background: rgba(0, 0, 0, 0.18);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-      }
-      .paneHeader .label {
-        font-size: 12px;
-        color: var(--muted);
-        user-select: none;
-      }
-
-      textarea {
-        width: 100%;
-        height: 100%;
-        padding: 12px;
-        border: none;
-        outline: none;
-        resize: none;
-        background: var(--panel2);
         color: rgba(255, 255, 255, 0.85);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
-        font-size: 12px;
-        line-height: 1.6;
-        tab-size: 2;
+        font-size: 13px;
+        line-height: 1.35;
+        user-select: none;
+        pointer-events: none;
+        backdrop-filter: blur(6px);
       }
-
-      pre {
-        margin: 0;
-        padding: 12px;
-        height: 100%;
-        overflow: auto;
-        background: var(--panel);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
-        font-size: 12px;
-        line-height: 1.6;
-        white-space: pre;
-      }
-
-      /* Highlight tokens */
-      .tok-kw {
-        color: var(--kw);
-        font-weight: 650;
-      }
-      .tok-evt {
-        color: var(--evt);
-        font-weight: 650;
-      }
-      .tok-type {
-        color: var(--type);
-        font-weight: 650;
-      }
-      .tok-lit {
-        color: var(--lit);
-      }
-      .tok-num {
-        color: var(--num);
-      }
-      .tok-ref {
-        color: var(--ref);
-        font-weight: 650;
-      }
-      .tok-prop {
-        color: var(--prop);
-      }
-      .tok-op {
-        color: var(--op);
-        font-weight: 650;
-      }
-      .tok-fn {
-        color: var(--fn);
-        font-weight: 650;
-      }
-      .tok-comma {
-        color: var(--dim);
-      }
-      .tok-comment {
-        color: rgba(255, 255, 255, 0.32);
-        font-style: italic;
-      }
-
-      .hint {
-        padding: 10px 12px;
-        border-top: 1px solid var(--border);
-        color: var(--muted);
-        font-size: 11px;
-        line-height: 1.45;
-        background: rgba(0, 0, 0, 0.12);
-      }
-      code.kbd {
-        padding: 1px 6px;
-        border: 1px solid var(--border);
-        border-bottom-color: rgba(255, 255, 255, 0.20);
-        border-radius: 7px;
-        background: rgba(255, 255, 255, 0.04);
-        color: rgba(255, 255, 255, 0.82);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
-        font-size: 11px;
+      #hud b {
+        color: rgba(255, 255, 255, 0.95);
       }
     </style>
   </head>
-
   <body>
-    <header>
-      <h1>Card DSL Syntax Highlighting</h1>
-      <p>
-        Left: edit raw DSL. Right: highlighted preview. Select a card/script
-        from the list. Quoted names at the start of a line are treated as script
-        invocations (e.g., <code class="kbd">"Bind Souls" for binder and binded</code>).
-      </p>
-    </header>
-
-    <div class="wrap">
-      <section class="panel">
-        <div class="topbar">
-          <div class="title">Cards & Scripts</div>
-          <div class="spacer"></div>
-          <button id="btnReset" title="Reset to the original examples">
-            Reset
-          </button>
-        </div>
-        <div class="list" id="cardList"></div>
-        <div class="hint">
-          Tip: The highlighter is deterministic and intentionally “reduced NLP”:
-          it highlights only a fixed set of constructs (Card/Script/When/choose,
-          built-in actions, possessions, numbers, string ids).
-        </div>
-      </section>
-
-      <section class="panel editor">
-        <div class="split">
-          <div class="pane">
-            <div class="paneHeader">
-              <div class="label">DSL Source</div>
-              <button id="btnCopy" title="Copy current DSL to clipboard">
-                Copy
-              </button>
-            </div>
-            <textarea id="src" spellcheck="false"></textarea>
-          </div>
-          <div class="pane">
-            <div class="paneHeader">
-              <div class="label">Highlighted</div>
-              <div class="label" id="status" style="opacity: 0.85"></div>
-            </div>
-            <pre id="out"></pre>
-          </div>
-        </div>
-      </section>
+    <div id="wrap">
+      <canvas id="gl"></canvas>
+      <div id="hud">
+        <div><b>Mouse Warp Demo</b> (WebGL shader)</div>
+        <div>Move mouse to warp. Scroll: radius. Shift+Scroll: strength.</div>
+        <div id="readout"></div>
+      </div>
     </div>
 
     <script>
-      // --- Example vertical-slice set (your revised syntax) ---
-      const EXAMPLES = [
-        {
-          kind: "Script",
-          name: 'Script "Bind Souls"',
-          desc: 'Tags two monsters as "bound" and transfers vitality.',
-          text: `Script "Bind Souls"
-choose a binder monster
-choose a binded monster
+      // ============================================================
+      // DROP-IN (fixed Y + more dramatic warp)
+      //
+      // Changes vs prior version:
+      //  1) Fix Y inversion: gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+      //  2) Stronger warp defaults + higher clamp range
+      //  3) More dramatic falloff: rational (long-tail) instead of Gaussian
+      // ============================================================
 
-When called,
-    binder gains "bound"
-    binded gains "bound"
-    deal 20 to binder
-    heal 20 to binded
-`,
-        },
-        {
-          kind: "Script",
-          name: 'Script "Sever Bond"',
-          desc: 'Removes the "bound" tag.',
-          text: `Script "Sever Bond"
-choose a subject monster
+      const glCanvas = document.getElementById("gl");
+      const gl = glCanvas.getContext("webgl", {
+        alpha: false,
+        antialias: false,
+        premultipliedAlpha: false,
+        preserveDrawingBuffer: false,
+      });
 
-When called,
-    subject loses "bound"
-`,
-        },
-        {
-          kind: "Script",
-          name: 'Script "Poison Touch"',
-          desc: 'Applies "poisoned" and initializes poison counter.',
-          text: `Script "Poison Touch"
-choose a victim monster
+      if (!gl) {
+        document.body.innerHTML =
+          "<pre style='color:#fff;padding:16px'>WebGL not available.</pre>";
+        throw new Error("WebGL not available");
+      }
 
-When called,
-    victim gains "poisoned"
-    victim's poison is 3
-`,
-        },
-        {
-          kind: "Card",
-          name: 'Card "Soul Priest"',
-          desc: 'Chooses binder/binded and invokes "Bind Souls".',
-          text: `Card "Soul Priest"
-this card's health is 60
+      // Offscreen 2D canvas for scene
+      const scene = document.createElement("canvas");
+      const ctx = scene.getContext("2d", { alpha: false });
 
-When casted,
-    caster's board adds this card
+      // Mouse state (in backing pixels)
+      const mouse = { x: 0, y: 0, has: false };
 
-When used,
-    choose a binder monster from caster's board that binder != this card,
-    choose a binded monster from opponent's board,
-        "Bind Souls" for binder and binded
-`,
-        },
-        {
-          kind: "Card",
-          name: 'Card "Toxic Whisperer"',
-          desc: 'Chooses victim and invokes "Poison Touch".',
-          text: `Card "Toxic Whisperer"
-this card's health is 50
+      // Warp params (in pixels) — stronger defaults
+      let sigmaPx = 170; // radius of influence
+      let ampPx = 40; // max displacement in pixels (dramatic)
 
-When casted,
-    caster's board adds this card
+      // Random circles scene state
+      const circles = [];
+      const CIRCLE_COUNT = 220;
 
-When used,
-    choose a victim monster from opponent's board,
-        "Poison Touch" on victim
-`,
-        },
-        {
-          kind: "Card",
-          name: 'Card "Bond Auditor"',
-          desc: 'Reactive economy: watches "bound" tag gain.',
-          text: `Card "Bond Auditor"
-this card's health is 40
+      function rand(min, max) {
+        return min + Math.random() * (max - min);
+      }
 
-When casted,
-    caster's board adds this card
-
-When a monster gains "bound",
-    this card's profit increases by 1
-    draw 1
-`,
-        },
-        {
-          kind: "Card",
-          name: 'Card "Bond Enforcer"',
-          desc: 'Reactive damage: punishes newly bound monsters.',
-          text: `Card "Bond Enforcer"
-this card's health is 80
-
-When casted,
-    caster's board adds this card
-
-When a monster gains "bound",
-    deal 10 to that monster
-`,
-        },
-        {
-          kind: "Card",
-          name: 'Card "Bond Breaker"',
-          desc: 'Counterplay: targets a bound monster and severs.',
-          text: `Card "Bond Breaker"
-this card's health is 70
-
-When casted,
-    caster's board adds this card
-
-When used,
-    choose a subject monster from opponent's board that subject has "bound",
-        "Sever Bond" on subject
-`,
-        },
-      ];
-
-      // --- Rendering list ---
-      const elList = document.getElementById("cardList");
-      const elSrc = document.getElementById("src");
-      const elOut = document.getElementById("out");
-      const elStatus = document.getElementById("status");
-
-      let activeIndex = 0;
-      let userEdits = new Array(EXAMPLES.length).fill(null);
-
-      function renderList() {
-        elList.innerHTML = "";
-        EXAMPLES.forEach((ex, i) => {
-          const btn = document.createElement("button");
-          btn.className = "cardButton" + (i === activeIndex ? " active" : "");
-          btn.type = "button";
-          btn.innerHTML = `
-            <p class="name">${escapeHtml(ex.name)}</p>
-            <p class="meta">${escapeHtml(ex.kind)} · ${escapeHtml(ex.desc)}</p>
-          `;
-          btn.addEventListener("click", () => {
-            saveActiveEdits();
-            activeIndex = i;
-            renderList();
-            loadActive();
+      function makeCircles() {
+        circles.length = 0;
+        for (let i = 0; i < CIRCLE_COUNT; i++) {
+          circles.push({
+            x: Math.random(),
+            y: Math.random(),
+            r: rand(6, 42),
+            hue: rand(0, 360),
+            a: rand(0.25, 0.9),
           });
-          elList.appendChild(btn);
-        });
-      }
-
-      function saveActiveEdits() {
-        userEdits[activeIndex] = elSrc.value;
-      }
-
-      function loadActive() {
-        const val = userEdits[activeIndex] ?? EXAMPLES[activeIndex].text;
-        elSrc.value = val;
-        highlightNow();
-      }
-
-      // --- Utilities ---
-      function escapeHtml(s) {
-        return s
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;");
-      }
-
-      function wrap(cls, s) {
-        return `<span class="${cls}">${s}</span>`;
-      }
-
-      // --- Syntax highlighting (intentionally reduced, regex-based) ---
-      function highlightNow() {
-        const src = elSrc.value.replaceAll("\r\n", "\n");
-
-        // Highlight line-by-line to keep indentation intact and allow "line-start invocation" rule.
-        const lines = src.split("\n");
-        const outLines = [];
-
-        for (const line of lines) {
-          outLines.push(highlightLine(line));
         }
+      }
+      makeCircles();
 
-        elOut.innerHTML = outLines.join("\n");
-        elStatus.textContent = `Lines: ${lines.length}`;
+      // ============================================================
+      // WebGL helpers
+      // ============================================================
+      function compileShader(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+          const msg = gl.getShaderInfoLog(s);
+          gl.deleteShader(s);
+          throw new Error(msg);
+        }
+        return s;
       }
 
-      function highlightLine(line) {
-        // Preserve indentation; process only the content part.
-        const m = line.match(/^(\s*)(.*)$/);
-        const indent = m ? m[1] : "";
-        let rest = m ? m[2] : line;
-
-        // Comment support (optional): '#' anywhere starts a comment.
-        // (You can remove this if you don't want comments.)
-        let comment = "";
-        const hash = rest.indexOf("#");
-        if (hash >= 0) {
-          comment = rest.slice(hash);
-          rest = rest.slice(0, hash);
+      function makeProgram(vsSrc, fsSrc) {
+        const p = gl.createProgram();
+        gl.attachShader(p, compileShader(gl.VERTEX_SHADER, vsSrc));
+        gl.attachShader(p, compileShader(gl.FRAGMENT_SHADER, fsSrc));
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+          const msg = gl.getProgramInfoLog(p);
+          gl.deleteProgram(p);
+          throw new Error(msg);
         }
-
-        // First: string literals.
-        // We do a two-phase approach:
-        // - temporarily replace string literals with placeholders
-        // - run keyword highlighting
-        // - restore strings as tok-lit spans
-        const strings = [];
-        rest = rest.replace(/"([^"\\]|\\.)*"/g, (s) => {
-          const idx = strings.length;
-          strings.push(s);
-          return `\u0000S${idx}\u0000`;
-        });
-
-        // Event headers and top-level decl keywords
-        rest = rest.replace(
-          /\b(Card|Script)\b/g,
-          (s) => wrap("tok-kw", s)
-        );
-
-        // "When ..." headers (event-ish)
-        // We highlight the "When" keyword, and also a few engine phrases if present.
-        rest = rest.replace(/\bWhen\b/g, (s) => wrap("tok-evt", s));
-
-        // choose
-        rest = rest.replace(/\bchoose\b/g, (s) => wrap("tok-kw", s));
-
-        // common prepositions / glue words you might want dimmed (optional)
-        rest = rest.replace(/\b(from|that|and|or|in|on|to|for|with)\b/g, (s) =>
-          wrap("tok-comma", s)
-        );
-
-        // built-in refs (feel free to expand)
-        rest = rest.replace(
-          /\b(this card|that monster|that card|caster|opponent)\b/g,
-          (s) => wrap("tok-ref", s)
-        );
-
-        // Possessives like: binder's, victim's, caster's, opponent's
-        // Note: "caster" and "opponent" already highlighted; this will still color the "'s".
-        rest = rest.replace(/\b([A-Za-z_][A-Za-z0-9_]*)'s\b/g, (full, name) => {
-          // Don't double-highlight "this card's" (handled as ref + possessive below),
-          // but it's okay if it does; still looks fine.
-          return wrap("tok-prop", `${name}'s`);
-        });
-
-        // Types (minimal): monster, card, player, board, hand, graveyard, deck
-        rest = rest.replace(
-          /\b(monster|card|player|board|hand|graveyard|deck)\b/gi,
-          (s) => wrap("tok-type", s)
-        );
-
-        // Numbers
-        rest = rest.replace(/\b\d+\b/g, (s) => wrap("tok-num", s));
-
-        // Operators / assignment-ish English
-        // Order matters: highlight multi-word phrases first.
-        rest = rest.replace(
-          /\b(increases by|decreases by|is now)\b/g,
-          (s) => wrap("tok-op", s)
-        );
-        rest = rest.replace(/\bis\b/g, (s) => wrap("tok-op", s));
-
-        // Built-in actions
-        rest = rest.replace(
-          /\b(deal|heal|draw|move|adds|removes|gains|loses|shuffle|swap)\b/g,
-          (s) => wrap("tok-fn", s)
-        );
-
-        // Special: Invocation lines start with a string literal placeholder at the beginning of rest.
-        // If the original line (after indent) began with a string literal, we emphasize it as invocation.
-        // We'll handle that when restoring strings, by checking the first token.
-        const startsWithStringPlaceholder = /^\u0000S\d+\u0000/.test(rest);
-
-        // Restore strings
-        rest = rest.replace(/\u0000S(\d+)\u0000/g, (full, idxStr) => {
-          const idx = Number(idxStr);
-          const s = strings[idx] ?? '""';
-          // Mark invocations slightly differently by reusing tok-lit but you can customize.
-          // Here we just use tok-lit; feel free to make tok-invoke if you want.
-          return wrap("tok-lit", escapeHtml(s));
-        });
-
-        // If invocation line: also embolden the opening literal by wrapping again is messy;
-        // Instead, give the whole line a subtle cue by turning the first literal into tok-evt+tok-lit.
-        if (startsWithStringPlaceholder) {
-          // Replace first tok-lit span with an "event-like" span to draw attention.
-          rest = rest.replace(
-            /<span class="tok-lit">/,
-            `<span class="tok-lit tok-evt">`
-          );
-        }
-
-        // Restore comment
-        if (comment) {
-          rest += wrap("tok-comment", escapeHtml(comment));
-        }
-
-        return indent + rest;
+        return p;
       }
 
-      // --- Wiring ---
-      document.getElementById("btnCopy").addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(elSrc.value);
-          elStatus.textContent = "Copied.";
-          setTimeout(() => highlightNow(), 350);
-        } catch {
-          elStatus.textContent = "Copy failed (browser permissions).";
+      function makeFullscreenQuad() {
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(
+          gl.ARRAY_BUFFER,
+          new Float32Array([
+            -1, -1, 1, -1, -1, 1, // tri 1
+            -1, 1, 1, -1, 1, 1, // tri 2
+          ]),
+          gl.STATIC_DRAW
+        );
+        return buf;
+      }
+
+      // ============================================================
+      // Shaders
+      // ============================================================
+      const VS = `
+attribute vec2 a_pos;
+varying vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+`;
+
+      // More dramatic warp: rational falloff (longer tail) instead of Gaussian.
+      // Also includes a mild "center punch" via pow().
+      const FS = `
+precision mediump float;
+
+uniform sampler2D u_scene;
+uniform vec2 u_resolution;   // backing-pixel resolution
+uniform vec2 u_mousePx;      // mouse in backing pixels
+uniform float u_ampPx;       // displacement amplitude in pixels
+uniform float u_sigmaPx;     // falloff radius in pixels
+uniform float u_enabled;     // 0/1
+
+varying vec2 v_uv;
+
+void main() {
+  vec2 pPx = v_uv * u_resolution;
+
+  if (u_enabled < 0.5) {
+    gl_FragColor = texture2D(u_scene, v_uv);
+    return;
+  }
+
+  vec2 r = pPx - u_mousePx;
+  float d2 = dot(r, r);
+  float d = sqrt(d2) + 1e-6;
+
+  // Long-tail falloff: g = A * (s^2 / (d^2 + s^2))
+  float s2 = u_sigmaPx * u_sigmaPx;
+  float base = s2 / (d2 + s2);
+
+  // Optional: "punch" the center slightly (lower exponent spreads, higher tightens)
+  float shaped = pow(base, 0.85);
+
+  float g = u_ampPx * shaped;
+
+  vec2 u = r / d;
+
+  // Inverse warp sample (good approximation for this effect)
+  vec2 srcPx = pPx - u * g;
+  vec2 srcUv = clamp(srcPx / u_resolution, vec2(0.0), vec2(1.0));
+
+  gl_FragColor = texture2D(u_scene, srcUv);
+}
+`;
+
+      const prog = makeProgram(VS, FS);
+      const quad = makeFullscreenQuad();
+
+      const a_pos = gl.getAttribLocation(prog, "a_pos");
+      const u_scene = gl.getUniformLocation(prog, "u_scene");
+      const u_resolution = gl.getUniformLocation(prog, "u_resolution");
+      const u_mousePx = gl.getUniformLocation(prog, "u_mousePx");
+      const u_ampPx = gl.getUniformLocation(prog, "u_ampPx");
+      const u_sigmaPx = gl.getUniformLocation(prog, "u_sigmaPx");
+      const u_enabled = gl.getUniformLocation(prog, "u_enabled");
+
+      // Scene texture
+      const sceneTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+      // FIX Y-INVERSION: flip rows when uploading the 2D canvas into the texture
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+      // ============================================================
+      // Resize handling (DPR-correct)
+      // ============================================================
+      function resize() {
+        const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+        const cssW = glCanvas.clientWidth || window.innerWidth;
+        const cssH = glCanvas.clientHeight || window.innerHeight;
+
+        const w = Math.max(1, Math.floor(cssW * dpr));
+        const h = Math.max(1, Math.floor(cssH * dpr));
+
+        if (glCanvas.width !== w || glCanvas.height !== h) {
+          glCanvas.width = w;
+          glCanvas.height = h;
+          gl.viewport(0, 0, w, h);
+
+          scene.width = w;
+          scene.height = h;
         }
+      }
+
+      window.addEventListener("resize", resize, { passive: true });
+      resize();
+
+      // ============================================================
+      // Input
+      // ============================================================
+      function updateMouseFromEvent(e) {
+        const rect = glCanvas.getBoundingClientRect();
+        const sx = glCanvas.width / rect.width;
+        const sy = glCanvas.height / rect.height;
+        mouse.x = (e.clientX - rect.left) * sx;
+        mouse.y = (e.clientY - rect.top) * sy;
+        mouse.has = true;
+      }
+
+      glCanvas.addEventListener("mousemove", updateMouseFromEvent, {
+        passive: true,
+      });
+      glCanvas.addEventListener(
+        "mouseleave",
+        () => {
+          mouse.has = false;
+        },
+        { passive: true }
+      );
+      glCanvas.addEventListener("mouseenter", updateMouseFromEvent, {
+        passive: true,
       });
 
-      document.getElementById("btnReset").addEventListener("click", () => {
-        userEdits = new Array(EXAMPLES.length).fill(null);
-        loadActive();
-      });
+      // Scroll: radius. Shift+Scroll: strength. (higher clamps)
+      window.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          const delta = Math.sign(e.deltaY);
 
-      elSrc.addEventListener("input", () => {
-        highlightNow();
-      });
+          if (e.shiftKey) {
+            ampPx = Math.max(0, Math.min(220, ampPx + delta * 6));
+          } else {
+            sigmaPx = Math.max(20, Math.min(900, sigmaPx + delta * 14));
+          }
+        },
+        { passive: false }
+      );
 
-      // init
-      renderList();
-      loadActive();
+      // Click to re-randomize circles
+      window.addEventListener(
+        "mousedown",
+        () => {
+          makeCircles();
+        },
+        { passive: true }
+      );
+
+      // ============================================================
+      // Scene drawing (random circles)
+      // ============================================================
+      const readout = document.getElementById("readout");
+
+      function drawScene2D(timeMs) {
+        const w = scene.width;
+        const h = scene.height;
+
+        ctx.fillStyle = "#0b0f14";
+        ctx.fillRect(0, 0, w, h);
+
+        // Subtle grid
+        ctx.globalAlpha = 0.12;
+        ctx.strokeStyle = "#9fb3c8";
+        ctx.lineWidth = 1;
+        const step = Math.max(32, Math.floor(Math.min(w, h) / 18));
+        ctx.beginPath();
+        for (let x = 0; x <= w; x += step) {
+          ctx.moveTo(x + 0.5, 0);
+          ctx.lineTo(x + 0.5, h);
+        }
+        for (let y = 0; y <= h; y += step) {
+          ctx.moveTo(0, y + 0.5);
+          ctx.lineTo(w, y + 0.5);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // Circles
+        const t = timeMs * 0.001;
+        for (let i = 0; i < circles.length; i++) {
+          const c = circles[i];
+
+          const px = c.x * w + Math.sin(t * 0.7 + i) * 4.0;
+          const py = c.y * h + Math.cos(t * 0.8 + i * 1.3) * 4.0;
+          const r = c.r * (0.75 + 0.25 * Math.sin(t * 0.9 + i * 0.4));
+
+          ctx.beginPath();
+          ctx.fillStyle = `hsla(${c.hue}, 80%, 60%, ${c.a})`;
+          ctx.arc(px, py, r, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.globalAlpha = 0.25;
+          ctx.strokeStyle = "rgba(255,255,255,0.75)";
+          ctx.lineWidth = 1.0;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+
+        // Cursor marker (warps too)
+        if (mouse.has) {
+          ctx.save();
+          ctx.globalAlpha = 0.9;
+          ctx.strokeStyle = "rgba(255,255,255,0.9)";
+          ctx.lineWidth = 2.0;
+          ctx.beginPath();
+          ctx.arc(mouse.x, mouse.y, 6, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        readout.textContent = `sigma=${sigmaPx.toFixed(
+          0
+        )}px, amp=${ampPx.toFixed(0)}px`;
+      }
+
+      // ============================================================
+      // Render loop
+      // ============================================================
+      function frame(timeMs) {
+        resize();
+        drawScene2D(timeMs);
+
+        // Upload scene to texture
+        gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          scene
+        );
+
+        // Warp pass
+        gl.useProgram(prog);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+        gl.enableVertexAttribArray(a_pos);
+        gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+        gl.uniform1i(u_scene, 0);
+
+        gl.uniform2f(u_resolution, glCanvas.width, glCanvas.height);
+
+        if (mouse.has) {
+          gl.uniform2f(u_mousePx, mouse.x, mouse.y);
+          gl.uniform1f(u_enabled, 1.0);
+        } else {
+          gl.uniform2f(u_mousePx, 0.0, 0.0);
+          gl.uniform1f(u_enabled, 0.0);
+        }
+
+        gl.uniform1f(u_ampPx, ampPx);
+        gl.uniform1f(u_sigmaPx, sigmaPx);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        requestAnimationFrame(frame);
+      }
+
+      requestAnimationFrame(frame);
     </script>
   </body>
 </html>
-```

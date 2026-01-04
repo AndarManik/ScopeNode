@@ -16,10 +16,8 @@ export const addUserSettings = (app) => {
   settings.render = render;
   render.scale = parseFloat(defaultGet("render.scale", 2));
   render.preferredSide = defaultGet("render.preferredSide", "none");
-  render.bulletSpeed = parseFloat(defaultGet("render.bulletSpeed", 50));
-  render.shellEjectAngleDeg = parseFloat(
-    defaultGet("render.shellEjectAngleDeg", 150)
-  );
+  render.bulletSpeed = parseFloat(defaultGet("render.bulletSpeed", 100));
+  render.shellAngle = parseFloat(defaultGet("render.shellAngle", 150));
 };
 
 export const defaultGet = (key, defaultValue) => {

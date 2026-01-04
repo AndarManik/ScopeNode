@@ -1,7 +1,9 @@
 import {
   addObstacle,
+  confirmPreviewObstacle,
   initializeObstacles,
   initializeReceivedObstacles,
+  receivePreviewObstacle,
 } from "./game/arena.js";
 import { newVirtualServer } from "./game/virtualserver.js";
 import { values } from "./values.js";
@@ -17,12 +19,9 @@ export const newGame = (app, options, team1, team2) => {
 
   const game = {};
 
-  // COLD VARIABLES
   Object.assign(game, values);
   parseGameOptions(app, game, options);
-  // WARM VARIABLES
   game.renderSettings = app.settings.render;
-  // HOT VARIABLES
   game.color = app.color;
 
   game.isMultiPlayer = team1 && team2;
@@ -58,7 +57,7 @@ export const newGame = (app, options, team1, team2) => {
     const now = performance.now();
     const delta = (now - last) / 1000;
     last = now;
-    update(game, delta);
+    update(game, app, delta, team1, team2);
     render(game, team1, team2);
     app.stats.log.set("FPS", Math.round(1 / delta));
     requestAnimationFrame(engineCycle);
@@ -134,60 +133,9 @@ export const newGame = (app, options, team1, team2) => {
       game.choosingObstacle = true;
     };
 
-    game.obstacleSendingLoop = () => {
-      game.previewObstacle = generateObstacle(
-        game,
-        game.mouse,
-        game.previewAngle,
-        game.previewAlpha
-      );
-
-      game.previewObstacle.index = validateNewObstacle(
-        game,
-        game.previewObstacle
-      );
-
-      if (game.mouse.isClicking && game.previewObstacle.index !== -1) {
-        game.choosingObstacle = false;
-        addObstacle(game, game.previewObstacle);
-        app.socket.json({
-          command: "confirm obstacle",
-          position: game.mouse,
-          angle: game.previewAngle,
-          alpha: game.previewAlpha,
-        });
-      } else {
-        app.socket.send(
-          packObstacle({
-            position: game.mouse,
-            angle: game.previewAngle,
-            alpha: game.previewAlpha,
-            index: game.previewObstacle.index,
-          })
-        );
-      }
-    };
-
-    game.receivePreviewObstacle = (obstacle) => {
-      game.previewingObstacle = true;
-      game.previewObstacle = generateObstacle(
-        game,
-        obstacle.position,
-        obstacle.angle,
-        obstacle.alpha
-      );
-      game.previewObstacle.index = obstacle.index;
-    };
-
     game.confirmPreviewObstacle = (obstacle) => {
       game.previewingObstacle = false;
-      game.previewObstacle = generateObstacle(
-        game,
-        obstacle.position,
-        obstacle.angle,
-        obstacle.alpha
-      );
-      addObstacle(game, game.previewObstacle);
+      confirmPreviewObstacle(game, obstacle);
       app.socket.json({ command: "has confirmed obstacle" });
     };
 
@@ -216,8 +164,7 @@ export const newGame = (app, options, team1, team2) => {
 
     game.handleMessage = ({ data }) => {
       if (game.virtualServer.isStopped) {
-        const obstacle = unpackObstacle(data);
-        obstacle && game.receivePreviewObstacle(obstacle);
+        if (receivePreviewObstacle(game, data)) game.previewingObstacle = true;
       } else game.virtualServer.addState(data);
     };
 
