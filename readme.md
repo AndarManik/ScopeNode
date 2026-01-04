@@ -1,6 +1,6 @@
 # **Scope Node**
 
-**Scope Node** is a multiplayer, top-down shooter that explores the essence of **positioning in raycast-based combat**. Players control **turret drones** that automatically aim and instantly eliminate enemies once line-of-sight is established.
+**Scope Node** is a multiplayer, top-down shooter that explores the core of **positioning in raycast combat**. Players control **turret drones** that automatically aim and instantly eliminate enemies.
 
 ## **Objectives**
 
