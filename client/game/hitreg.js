@@ -148,7 +148,7 @@ export function registerTarget(shooter, enemies, radius) {
   );
 
   const { point: target, dist2: enemyPointDist } = closestPointToClosedPolygon(
-    ...(subTarget || bestEnemy[1]),
+    ...(subTarget || bestEnemy[2]),
     shooter[0]
   );
 

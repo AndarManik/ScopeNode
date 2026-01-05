@@ -1,14 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- =======================================================
+         Core document metadata
+         ======================================================= -->
     <meta charset="UTF-8" />
-    <title>WebSocket Test</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0a0a0a" />
+
+    <title>Scope Node</title>
+    <meta name="description" content="Realtime multiplayer Aimbot shooter" />
+
+    <!-- =======================================================
+         Icons (tab, bookmarks, mobile home screen)
+         ======================================================= -->
+    <link rel="icon" href="./assets/icons/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="./assets/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
+
+    <!-- Optional but recommended if you want installability later -->
+    <link rel="manifest" href="./manifest.json" />
+
+    <!-- =======================================================
+         Social preview metadata (Discord/Twitter/etc.)
+         ======================================================= -->
+    <meta property="og:title" content="Scope Node" />
+    <meta
+      property="og:description"
+      content="Realtime multiplayer shooter prototype (WebSocket + canvas)."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="./assets/og/og.png" />
+
+    <!-- =======================================================
+         Security (dev-friendly CSP)
+         NOTE: If you later load assets from other domains, update this.
+         ======================================================= -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        font-src https://fonts.gstatic.com;
+        connect-src 'self' ws: wss:;
+        img-src 'self' data:;
+      "
+    />
+
+    <!-- =======================================================
+         Performance
+         ======================================================= -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap"
       rel="stylesheet"
     />
+    <link rel="modulepreload" href="./app.js" />
+
     <style>
       :root {
         --dark: oklch(0.15 0 0);
@@ -86,6 +140,7 @@
       #App {
         height: 768px;
         width: 1024px;
+        position: relative;
       }
 
       #Game {
@@ -122,6 +177,7 @@
         line-break: strict;
         padding: 8px;
         opacity: 1;
+        color: var(--dark);
       }
 
       #Huge {
@@ -149,20 +205,48 @@
 
       #Stats {
         position: absolute;
+        left: 0;
         top: 8px;
-        background: #00000000;
+        width: 1024px;
+        background: transparent;
         color: var(--light);
-        width: 100%;
+        pointer-events: none;
       }
     </style>
+
+    <!-- =======================================================
+         Debug visibility (keeps websocket/app failures from being silent)
+         ======================================================= -->
+    <script>
+      window.addEventListener("error", (e) => {
+        console.error("Global error:", e.error || e.message);
+      });
+      window.addEventListener("unhandledrejection", (e) => {
+        console.error("Unhandled promise rejection:", e.reason);
+      });
+    </script>
   </head>
+
   <body>
-    <div id="App">
-      <canvas id="Game" width="1024" height="768"> </canvas>
+    <noscript>
+      <style>
+        body {
+          background: black;
+          color: white;
+          font-family: system-ui, sans-serif;
+          padding: 24px;
+        }
+      </style>
+      <p>This application requires JavaScript.</p>
+    </noscript>
+
+    <div id="App" role="application" aria-label="Scope Node">
+      <canvas id="Game" width="1024" height="768"></canvas>
       <div id="Huge"></div>
       <div id="Menu"></div>
+      <p id="Stats"></p>
     </div>
-    <p id="Stats"></p>
+
     <script src="./app.js" type="module"></script>
   </body>
 </html>
