@@ -246,18 +246,18 @@ export const render = (game, team1, team2) => {
   const obstacleRadius =
     timeBeta * playerRadius + timeAlpha * Math.hypot(mapWidth, mapHeight);
 
-  if (obstacleRadius === playerRadius) {
+  if (obstacleRadius - playerRadius <= 1e-4) {
     ctx.fillStyle = color.centerObjective;
     ctx.beginPath();
     ctx.arc(...game.centerObjective, playerRadius, 0, Math.PI * 2);
     ctx.fill();
   } else {
-    ctx.lineWidth = playerRadius * 2;
+    ctx.lineWidth = playerRadius * 2 * timeBeta;
     ctx.strokeStyle = color.centerObjective;
     ctx.beginPath();
     ctx.arc(
       ...game.centerObjective,
-      obstacleRadius - playerRadius,
+      obstacleRadius - ctx.lineWidth / 2,
       0,
       Math.PI * 2
     ); // full circle

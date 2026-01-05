@@ -1,5 +1,4 @@
 import {
-  addObstacle,
   confirmPreviewObstacle,
   initializeObstacles,
   initializeReceivedObstacles,
@@ -10,9 +9,6 @@ import { values } from "./values.js";
 import { update } from "./game/update.js";
 import { render } from "./game/render.js";
 import { newKeyBoard, newMouse } from "./game/input.js";
-import { generateObstacle } from "./game/obstaclegenerator.js";
-import { validateNewObstacle } from "./game/obstaclevalidator.js";
-import { packObstacle, unpackObstacle } from "./game/binary.js";
 
 export const newGame = (app, options, team1, team2) => {
   if (app.game) app.game.isDead = true;
@@ -187,20 +183,20 @@ const parseGameOptions = (app, game, options) => {
       game.playerRadius = 18;
       game.moveSpeed = 6;
       game.obstacleArea = 5;
-      game.obstacleStartCount = 10;
+      game.obstacleStartCount = 6;
       break;
 
     case "medium":
       game.playerRadius = 14;
       game.moveSpeed = 6.25;
       game.obstacleArea = 5;
-      game.obstacleStartCount = 16;
+      game.obstacleStartCount = 10;
       break;
     case "large":
       game.playerRadius = 10;
       game.moveSpeed = 6.5;
       game.obstacleArea = 5;
-      game.obstacleStartCount = 24;
+      game.obstacleStartCount = 16;
       break;
   }
 };

@@ -1,5 +1,6 @@
 import { newGame } from "./game.js";
 import { lobby, updateLobbyNames, updateLobbySize } from "./menu/lobby.js";
+import { couldBeLobbyCode } from "./menu/namegen.js";
 import { jiggleApp } from "./screentransform.js";
 
 export const newSocket = (app) => {
@@ -32,6 +33,13 @@ export const newSocket = (app) => {
     const { name, id } = app;
     if (name) socket.json({ command: "name change", name });
     if (id) socket.json({ command: "reconnect", id });
+    else {
+      const path = window.location.pathname;
+      const lobbyCode = path.startsWith("/") ? path.slice(1) : path;
+      if (lobbyCode && couldBeLobbyCode(lobbyCode))
+        socket.json({ command: "join lobby", lobbyCode });
+      window.history.replaceState(null, "", "/");
+    }
   };
 
   const initialMessage = (message) => {

@@ -53,8 +53,8 @@ export const lobby = (app) => {
   lobbyCode.style.cursor = "pointer";
   lobbyCode.addEventListener("click", () => {
     if (lobbyCode.bounceTimeout) clearTimeout(lobbyCode.bounceTimeout);
-    navigator.clipboard.writeText(menu.lobbyCode);
-    lobbyCode.innerText = "Copied " + menu.lobbyCode + " to clipboard";
+    navigator.clipboard.writeText(`${location.origin}/${menu.lobbyCode}`);
+    lobbyCode.innerText = "Copied URL " + menu.lobbyCode + " to clipboard";
     lobbyCode.bounceTimeout = setTimeout(() => {
       lobbyCode.innerText = "Lobby Code: " + menu.lobbyCode;
     }, 1500);

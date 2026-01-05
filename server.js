@@ -13,12 +13,11 @@ app.use(express.static(path.join(__dirname, "client")));
 
 const clientPath = path.join(__dirname, "client", "client.html");
 app.get("/", (req, res) => res.sendFile(clientPath));
+app.get("/:lobby", (req, res) => res.sendFile(clientPath));
 
 const server = createServer(app);
 const webSocketServer = new WebSocketServer({ server });
 
-const PORT = 9001;
+const PORT = process.env.PORT || 9001;
 server.listen(PORT, () => console.log(`http://localhost:${PORT}`));
-
 newLobbyServer(webSocketServer);
-

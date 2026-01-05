@@ -141,13 +141,29 @@ export function registerTarget(shooter, enemies, radius) {
     }
   }
   if (!bestEnemy) return [null, false];
-  const target = closestPointToClosedPolygon(...bestEnemy[2], shooter[0]).point;
+
+  const { point: subTarget, dist2: enemyBodyDist } = closestPointToBodyUnion(
+    ...bestEnemy[2],
+    shooter[1]
+  );
+
+  const { point: target, dist2: enemyPointDist } = closestPointToClosedPolygon(
+    ...(subTarget || bestEnemy[1]),
+    shooter[0]
+  );
+
   const pointDist = closestPointToClosedPolygon(
     ...bodyPoint,
     bestEnemy[0]
   ).dist2;
-  const advantage = Math.sqrt(pointDist) > radius;
-  return [target, advantage];
+
+  const shooterAdvantage = Math.sqrt(pointDist) > radius;
+
+  const targetAdvantage = subTarget
+    ? Math.sqrt(enemyPointDist) > radius
+    : Math.sqrt(enemyPointDist) - Math.sqrt(enemyBodyDist) > radius;
+
+  return [target, shooterAdvantage && !targetAdvantage];
 }
 
 /** Closest point to union of bodyPolys (min over polys). */

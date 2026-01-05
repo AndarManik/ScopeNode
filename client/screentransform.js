@@ -1,7 +1,4 @@
-// DROP-IN: paste this whole block (replaces your current code)
-
 const app = document.getElementById("App");
-
 const maxTilt = 0.5; // degrees — mouse-driven tilt cap
 let currentTiltX = 0;
 let currentTiltY = 0;
@@ -128,7 +125,14 @@ function render(now) {
   currentTiltX += (targetTiltX - currentTiltX) * lerp;
   currentTiltY += (targetTiltY - currentTiltY) * lerp;
 
-  app.style.transform = `
+  Game.style.transform = `
+    perspective(600px)
+    translate3d(${jiggleX + jabX}px, ${jiggleY + jabY}px, 0)
+    rotateX(${currentTiltX + jiggleTiltX + jabTiltX}deg)
+    rotateY(${currentTiltY + jiggleTiltY + jabTiltY}deg)
+  `;
+
+  Menu.style.transform = `
     perspective(600px)
     translate3d(${jiggleX + jabX}px, ${jiggleY + jabY}px, 0)
     rotateX(${currentTiltX + jiggleTiltX + jabTiltX}deg)
