@@ -1,31 +1,13 @@
 # **Scope Node**
 
-**Scope Node** is a multiplayer, top-down shooter that explores the core of **positioning in raycast combat**. Players control **turret drones** that automatically aim and instantly eliminate enemies.
+**Scope Node** is a multiplayer top-down aimbot shooter, where movement and positioning are the only controls.
 
-## **Objectives**
+Combat takes place in an arena of randomized obstacles. After every round, the losing team chooses where the next obstacle is placed.
 
-A round can be won in one of two ways:
+At the center of the map is an **Orb** which instantly kills the enemy team when touched.
 
-* **Elimination Victory** - Destroy all opposing players.
-* **Objective Victory** - Be the first team to reach and touch the **central orb**.
+If the round has not finished after 30 seconds, the **Orb** will expand until the team closest to the center wins.
 
-## **Arena**
+# **Screen Shot**
 
-* Each match begins with an arena populated by **randomly placed obstacles**.
-* At the end of every round, the **losing team** gains a strategic advantage:
-
-  * They may place **one new obstacle** anywhere on the map.
-
-## **Match Structure**
-
-* Matches are played over multiple rounds.
-* The first team to win **N rounds** claims overall victory.
-
-## **Interface**
-
-Regions on the map will be highlighted different colors depending on the state of the position.
-
-* **Safe Zone** - The region seen by your team
-* **Blind Spot** - The region that can see someone on your team but cannot be seen by your team
-
-<img width="1272" height="962" alt="image" src="https://github.com/user-attachments/assets/02daf289-0455-434f-b74a-7c4240089f85" />
+<img width="1269" height="959" alt="image" src="https://github.com/user-attachments/assets/83596407-d051-4656-8471-d82cd28f6dcc" />
