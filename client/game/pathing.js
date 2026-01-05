@@ -1,10 +1,22 @@
+import { LightGraph } from "./lightVisibilityGraph.js";
+import { removeHoles, toMulti } from "./martinezutil.js";
 import { kickout, newKickoutParams } from "./pathkickout.js";
-import { makeLazyAPSP, PathGraph } from "./pathVisibilityGraph.js";
+import { makeLazyAPSP } from "./pathVisibilityGraph.js";
 
 export const pushPathingObstacle = (game, obstacle) => {
-  if (!game.pathGraph) game.pathGraph = new PathGraph();
+  pushManyPathingObstacle(game, [obstacle]);
+};
 
-  game.pathGraph.pushPolygon(obstacle.pathPoly);
+export const pushManyPathingObstacle = (game, obstacles) => {
+  obstacles.forEach((obstacle) => {
+    const newPathGroup = toMulti(obstacle.pathPoly);
+    if (!game.pathTotal) game.pathTotal = newPathGroup;
+    else game.pathTotal = martinez.union(game.pathTotal, newPathGroup);
+    game.pathTotal = removeHoles(game.pathTotal);
+  });
+  game.pathGraph = new LightGraph(game);
+  game.pathTotal.forEach(([poly]) => game.pathGraph.pushPolygon(poly));
+
   game.apsp = makeLazyAPSP(game.pathGraph);
   game.kickoutParams = newKickoutParams(game.obstacleTotal);
 };

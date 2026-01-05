@@ -6,35 +6,24 @@ import {
   pushValidObstacle,
   validateNewObstacle,
 } from "./obstaclevalidator.js";
-import { pushPathingObstacle } from "./pathing.js";
+import { pushManyPathingObstacle, pushPathingObstacle } from "./pathing.js";
 
 export const initializeObstacles = (game) => {
   setupObstacleBlockers(game);
 
   let placementBalance = 0;
   for (let i = 0; i < game.obstacleStartCount; i++) {
-    const obstacle = generateObstacle(game, [0, 0]);
-
     while (true) {
       let pos = sampleNormal(game);
       if (i === 0) pos[1] = game.mapHeight / 2;
-
-      if (teamBalance(game, pos) * placementBalance > 0)
-        pos = mirrorAcrossMap(game, pos);
-      placementBalance += teamBalance(game, pos);
-
-      console.log(placementBalance);
-      const rot = Math.random() * Math.PI * 2;
-      const poly = transformPoints(pos, rot, obstacle.poly);
-      const pathPoly = transformPoints(pos, rot, obstacle.pathPoly);
-      const positionedObstacle = { poly, pathPoly };
-
-      if (pushValidObstacle(game, positionedObstacle)) {
-        pushPathingObstacle(game, positionedObstacle);
-        break;
-      }
+      const balance = teamBalance(game, pos);
+      if (balance * placementBalance > 0) continue;
+      placementBalance += balance;
+      const obstacle = generateObstacle(game, pos);
+      if (pushValidObstacle(game, obstacle)) break;
     }
   }
+  pushManyPathingObstacle(game, game.obstacles);
   pushManyLightingObstacles(game, game.obstacles);
 };
 
@@ -43,8 +32,8 @@ export const initializeReceivedObstacles = (game, obstacles) => {
 
   obstacles.forEach((obstacle) => {
     pushValidObstacle(game, obstacle);
-    pushPathingObstacle(game, obstacle);
   });
+  pushManyPathingObstacle(game, game.obstacles);
   pushManyLightingObstacles(game, game.obstacles);
 };
 

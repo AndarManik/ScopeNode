@@ -785,9 +785,6 @@ export class LightGraph {
     const result = [];
     const N = this.vertices.length;
 
-    // Build incident edge map once (lets rays slide across existing edges)
-    const incident = this._buildIncidentEdgeMap();
-
     for (let j = 0; j < N; j++) {
       if (this._occluded[j]) continue; // skip permanently occluded vertices
       const V = this.vertices[j];
@@ -796,7 +793,7 @@ export class LightGraph {
       if (this._ptEq(pos, V, eps)) continue;
 
       // Use grid-based visibility test (adapted for point→vertex)
-      if (this._visibleFromPointToVertex(pos, j, incident, eps)) {
+      if (this._visibleFromPointToVertex(pos, j)) {
         result.push(j);
       }
     }
@@ -1376,7 +1373,7 @@ export class LightGraph {
   /**
    * Grid-accelerated visibility check for arbitrary source point → vertex j.
    */
-  _visibleFromPointToVertex(P, j, incident, eps) {
+  _visibleFromPointToVertex(P, j) {
     const vertex = this.vertices[j];
     const delta = [P[0] - vertex[0], P[1] - vertex[1]];
     const distance = Math.hypot(delta[0], delta[1]);
@@ -1819,6 +1816,7 @@ export class LightGraph {
   }
 
   _buildIncidentEdgeMap() {
+    if (this.incidentEdgeMapBuilt) return this.incidentEdgeMapBuilt;
     const m = new Map();
     for (let i = 0; i < this.vertices.length; i++) m.set(i, new Set());
     for (let i = 0; i < this.vertices.length; i++) {
@@ -1826,7 +1824,8 @@ export class LightGraph {
         m.get(i).add(j);
       }
     }
-    return m;
+    this.incidentEdgeMapBuilt = m;
+    return this.incidentEdgeMapBuilt;
   }
 
   _areRingAdjacent(idxs, i, j) {
