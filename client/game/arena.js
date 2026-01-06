@@ -1,6 +1,6 @@
 import { packObstacle, unpackObstacle } from "./binary.js";
 import { pushLightingObstacle, pushManyLightingObstacles } from "./lighting.js";
-import { generateObstacle, transformPoints } from "./obstaclegenerator.js";
+import { generateObstacle } from "./obstaclegenerator.js";
 import {
   setupObstacleBlockers,
   pushValidObstacle,

@@ -15,6 +15,8 @@ export const newMenu = (app) => {
     appEl.style.cursor = menu.open ? "default" : "none";
 
     jiggleApp();
+
+    if (menu.open) requestAnimationFrame(update);
   };
 
   document.addEventListener("keydown", (event) => {
@@ -51,6 +53,7 @@ export const newMenu = (app) => {
   };
   let lastTime = performance.now();
   const update = (now) => {
+    if (!menu.open) return;
     let dt = (now - lastTime) / 1000; // seconds
     lastTime = now;
     if (dt > 0.05) dt = 0.05;
