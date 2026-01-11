@@ -1,5 +1,4 @@
 import { jabApp } from "../screentransform.js";
-import { drawPlayer } from "./render.js";
 
 export const animateShot = (game, ctx, shot, s) => {
   const { color, playerRadius, renderSettings } = game;
@@ -8,22 +7,12 @@ export const animateShot = (game, ctx, shot, s) => {
   if (finished) return;
 
   if (!shot.isHit) {
-    ctx.lineWidth = (2 * playerRadius) / 2.5;
-    ctx.strokeStyle = team1 ? color.team2Player : color.team1Player;
-    ctx.beginPath();
-    ctx.arc(
-      ...killedPosition,
-      playerRadius - playerRadius / 2.5,
-      0,
-      Math.PI * 2
-    );
-    ctx.stroke();
-
     // Base colors
     const playerColor = team1 ? color.team2Player : color.team1Player;
     const gunColor = team1 ? color.team2Gun : color.team1Gun;
-    drawPlayer(
-      ctx,
+    const glowColor = team1 ? color.team2Disk : color.team1Disk;
+
+    game.drawPlayer(
       killedPosition,
       playerRadius,
       playerColor,
@@ -31,7 +20,12 @@ export const animateShot = (game, ctx, shot, s) => {
       Math.atan2(
         killerPosition[1] - killedPosition[1],
         killerPosition[0] - killedPosition[0]
-      )
+      ),
+      {
+        glowRadius: playerRadius / 1.25,
+        glowColor: glowColor,
+        composite: "hard-light",
+      }
     );
   }
 

@@ -29,10 +29,6 @@ export const newGame = (app, options, team1, team2) => {
   game.spawn2 = [game.mapWidth - 3 * game.playerRadius, game.mapHeight / 2];
   game.centerObjective = [game.mapWidth / 2, game.mapHeight / 2];
 
-  game.color.intersectPoint = game.isTeam1
-    ? game.color.intersectPoint1
-    : game.color.intersectPoint2;
-
   game.previewAlpha = 0;
   game.previewAngle = 0;
 
@@ -53,11 +49,25 @@ export const newGame = (app, options, team1, team2) => {
     const now = performance.now();
     const delta = (now - last) / 1000;
     last = now;
-    update(game, app, delta, team1, team2);
-    render(game, team1, team2);
+    try {
+      update(game, app, delta, team1, team2);
+    } catch (err) {
+      console.error("ENGINE UPDATE ERROR:", err);
+    }
+    try {
+      render(game, team1, team2);
+    } catch (err) {
+      console.error("ENGINE RENDER ERROR:", err);
+    }
+    try {
+      game.virtualServer.nextTick();
+    } catch (err) {
+      console.error("ENGINE VSERVER ERROR:", err);
+    }
     app.stats.log.set("FPS", Math.round(1 / delta));
     requestAnimationFrame(engineCycle);
   };
+
   init();
   engineCycle();
 
@@ -98,6 +108,9 @@ export const newGame = (app, options, team1, team2) => {
 
     game.handleEndRound = (winner, score) => {
       const showRoundResultText = () => {
+        for (const shot of game.virtualServer.shots) if (!shot.isHit) return;
+        clearInterval(checker);
+
         const teamString = game.isTeam1 ? "team1" : "team2";
         hugeText.classList.remove("fading-out");
         hugeText.style.opacity = 0.9;
@@ -109,14 +122,15 @@ export const newGame = (app, options, team1, team2) => {
             ? "ROUND WON"
             : "ROUND LOST";
         hugeText.innerText = `${score.join(" - ")}\n${resultText}`;
+
+        setTimeout(fadeOutRoundText, 3000);
+        setTimeout(() => app.socket.json({ command: "round end" }), 4000);
       };
       const fadeOutRoundText = () => {
         hugeText.classList.add("fading-out");
         hugeText.style.opacity = 0;
       };
-      setTimeout(showRoundResultText, 500);
-      setTimeout(fadeOutRoundText, 3500);
-      setTimeout(() => app.socket.json({ command: "round end" }), 4500);
+      const checker = setInterval(showRoundResultText, 50);
     };
 
     game.stopVirtualServer = () => {
@@ -153,7 +167,7 @@ export const newGame = (app, options, team1, team2) => {
         hugeText.classList.add("fading-out");
         hugeText.style.opacity = 0;
       };
-      setTimeout(showRoundResultText(game, hugeText, winner), 500);
+      setTimeout(showRoundResultText, 500);
       setTimeout(fadeOutRoundText, 3500);
       setTimeout(() => !app.menu.open && app.menu.toggle(), 4500);
     };
@@ -181,22 +195,22 @@ const parseGameOptions = (app, game, options) => {
   switch (options) {
     case "small":
       game.playerRadius = 18;
-      game.moveSpeed = 6;
-      game.obstacleArea = 5;
-      game.obstacleStartCount = 6;
+      game.moveSpeed = 6.25;
+      game.obstacleArea = 5.5;
+      game.obstacleStartCount = 4;
       break;
 
     case "medium":
       game.playerRadius = 14;
       game.moveSpeed = 6.25;
-      game.obstacleArea = 5;
-      game.obstacleStartCount = 10;
+      game.obstacleArea = 5.5;
+      game.obstacleStartCount = 8;
       break;
     case "large":
       game.playerRadius = 10;
-      game.moveSpeed = 6.5;
-      game.obstacleArea = 5;
-      game.obstacleStartCount = 16;
+      game.moveSpeed = 6.25;
+      game.obstacleArea = 5.5;
+      game.obstacleStartCount = 12;
       break;
   }
 };

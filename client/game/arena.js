@@ -5,27 +5,42 @@ import {
   setupObstacleBlockers,
   pushValidObstacle,
   validateNewObstacle,
+  pushValidObstaclePair,
 } from "./obstaclevalidator.js";
 import { pushManyPathingObstacle, pushPathingObstacle } from "./pathing.js";
 
 export const initializeObstacles = (game) => {
   setupObstacleBlockers(game);
 
+  const style = Math.random() < 0.5 ? mirrorAcrossMap : rotateAcrossMap;
+
   let placementBalance = 0;
-  for (let i = 0; i < game.obstacleStartCount; i++) {
+  for (let i = 0; i < game.obstacleStartCount / 2; i++) {
     while (true) {
       let pos = sampleNormal(game);
       if (i === 0) pos[1] = game.mapHeight / 2;
-      const balance = teamBalance(game, pos);
-      if (balance * placementBalance > 0) continue;
-      placementBalance += balance;
       const obstacle = generateObstacle(game, pos);
-      if (pushValidObstacle(game, obstacle)) break;
+      const obstacle2 = generateObstacle(game, style(game, pos));
+      if (
+        validateNewObstacle(game, obstacle) !== -1 &&
+        validateNewObstacle(game, obstacle2) !== -1
+      ) {
+        pushValidObstacle(game, obstacle);
+        pushValidObstacle(game, obstacle2);
+        break;
+      }
     }
   }
   pushManyPathingObstacle(game, game.obstacles);
   pushManyLightingObstacles(game, game.obstacles);
 };
+
+const rotateAcrossMap = (game, [x, y]) => [
+  game.mapWidth - x,
+  game.mapHeight - y,
+];
+
+const mirrorAcrossMap = (game, [x, y]) => [game.mapWidth - x, y];
 
 export const initializeReceivedObstacles = (game, obstacles) => {
   setupObstacleBlockers(game);
@@ -104,11 +119,6 @@ const sampleNormal = (game, W = game.mapWidth, H = game.mapHeight, s = 0.5) => [
   Math.min(H, Math.max(0, H / 2 + randomNormal() * (H / 2) * s)),
 ];
 
-const mirrorAcrossMap = (game, [x, y]) => [
-  game.mapWidth - x,
-  game.mapHeight - y,
-];
-
 const teamBalance = (game, p) => {
   const R0 = 0.01 * Math.min(game.mapWidth, game.mapHeight);
   const R1 = 0.25 * Math.min(game.mapWidth, game.mapHeight);
@@ -125,7 +135,7 @@ const teamBalance = (game, p) => {
   };
   const b1 = block(game.spawn1);
   const b2 = block(game.spawn2);
-  return Math.tanh(2 * (b2 - b1));
+  return Math.tanh((b2 - b1) / 2);
 };
 
 const pointToSegment = (p, a, b) => {
@@ -147,17 +157,21 @@ const pointToSegment = (p, a, b) => {
   };
 };
 
-//testing function which shows heat map of placement
-export async function copyTeamBalanceHeatmap(game, opts = {}) {
-  const {
-    // sampling resolution: 1 = full res, 2 = half res, etc
-    step = 1,
+window.openTeamBalanceHeatmap = () =>
+  openTeamBalanceHeatmap({
+    mapWidth: 1024,
+    mapHeight: 768,
+    centerObjective: [512, 384],
+    spawn1: [24, 384],
+    spawn2: [1000, 384],
+  });
 
-    // colors in linear RGB space
-    // team2 (negative), neutral, team1 (positive)
-    negColor = [110, 155, 251], // blue
-    midColor = [158, 158, 158], // light grey
-    posColor = [237, 118, 101], // red
+const openTeamBalanceHeatmap = async (game, opts = {}) => {
+  const {
+    step = 1,
+    negColor = [223, 33, 8],
+    midColor = [121, 121, 121],
+    posColor = [12, 111, 249],
   } = opts;
 
   const W = Math.ceil(game.mapWidth / step);
@@ -171,9 +185,7 @@ export async function copyTeamBalanceHeatmap(game, opts = {}) {
   const img = ctx.createImageData(W, H);
   const data = img.data;
 
-  // linear interpolation
   const lerp = (a, b, t) => a + (b - a) * t;
-
   const mixColor = (c1, c2, t) => [
     lerp(c1[0], c2[0], t),
     lerp(c1[1], c2[1], t),
@@ -186,19 +198,11 @@ export async function copyTeamBalanceHeatmap(game, opts = {}) {
       const worldX = x * step;
       const worldY = y * step;
 
-      // ∈ [-1, 1]
-      const v = teamBalance(game, [worldX, worldY]);
+      const v = teamBalance(game, [worldX, worldY]); // [-1,1]
 
       let color;
-      if (v < 0) {
-        // map [-1,0] → [0,1]
-        const t = -v;
-        color = mixColor(midColor, negColor, t);
-      } else {
-        // map [0,1] → [0,1]
-        const t = v;
-        color = mixColor(midColor, posColor, t);
-      }
+      if (v < 0) color = mixColor(midColor, negColor, -v);
+      else color = mixColor(midColor, posColor, v);
 
       data[i++] = color[0];
       data[i++] = color[1];
@@ -209,7 +213,6 @@ export async function copyTeamBalanceHeatmap(game, opts = {}) {
 
   ctx.putImageData(img, 0, 0);
 
-  // upscale to full map size if step > 1
   let finalCanvas = canvas;
   if (step !== 1) {
     finalCanvas = document.createElement("canvas");
@@ -221,6 +224,13 @@ export async function copyTeamBalanceHeatmap(game, opts = {}) {
   }
 
   const blob = await new Promise((res) => finalCanvas.toBlob(res, "image/png"));
+  const url = URL.createObjectURL(blob);
 
-  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-}
+  // Open in a new tab
+  window.open(url, "_blank", "noopener");
+
+  // Optional cleanup later
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+
+  return { blob, url, canvas: finalCanvas };
+};

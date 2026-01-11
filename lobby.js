@@ -3,6 +3,7 @@ export const newLobby = (code) => {
   const connected = new Set();
   const team1 = new Set();
   const team2 = new Set();
+  const players = new Set();
   const spectators = new Set();
 
   const lobby = { code, connected, mapSize: "medium" };
@@ -10,9 +11,12 @@ export const newLobby = (code) => {
   lobby.addConnection = (socket) => {
     socket.userId = crypto.randomUUID();
     connected.add(socket);
-    if (team1.size + team2.size === 10) spectators.add(socket);
-    else if (team1.size > team2.size) team2.add(socket);
-    else team1.add(socket);
+    if (team1.size + team2.size < 10) {
+      players.add(socket);
+      if (team1.size <= team2.size) team1.add(socket);
+      else team2.add(socket);
+    } else spectators.add(socket);
+
     socket.json({ command: "lobby user id", userId: socket.userId });
     lobby.sendNames();
     lobby.sendSize();
@@ -22,15 +26,22 @@ export const newLobby = (code) => {
     connected.delete(socket);
     team1.delete(socket);
     team2.delete(socket);
+    players.delete(socket);
     spectators.delete(socket);
     lobby.sendNames();
   };
 
   lobby.awakeConnection = (oldSocket, socket) => {
     socket.userId = oldSocket.userId;
+    socket.clientState = oldSocket.clientState;
+    socket.isDead = oldSocket.isDead;
+    socket.kills = oldSocket.kills;
+    socket.confirmed = oldSocket.confirmed;
+
     replaceInSet(connected, oldSocket, socket);
     replaceInSet(team1, oldSocket, socket);
     replaceInSet(team2, oldSocket, socket);
+    replaceInSet(players, oldSocket, socket);
     replaceInSet(spectators, oldSocket, socket);
   };
 
@@ -63,10 +74,13 @@ export const newLobby = (code) => {
     if (team === "team2" && team2.size >= 5) return;
     team1.delete(socket);
     team2.delete(socket);
+    players.delete(socket);
     spectators.delete(socket);
-    if (team === "team1") team1.add(socket);
-    else if (team === "team2") team2.add(socket);
-    else spectators.add(socket);
+    if (team !== "spec") {
+      players.add(socket);
+      if (team === "team1") team1.add(socket);
+      else if (team === "team2") team2.add(socket);
+    } else spectators.add(socket);
     lobby.sendNames();
   };
 
@@ -94,9 +108,7 @@ export const newLobby = (code) => {
     lobby.toWin = toWinMap[lobby.mapSize];
     lobby.score = [0, 0];
 
-    lobby.players = new Set([...team1, ...team2]);
-
-    lobby.players.forEach((socket) => {
+    players.forEach((socket) => {
       socket.isDead = false;
       socket.kills = 0;
       socket.confirmed = new Map();
@@ -140,7 +152,7 @@ export const newLobby = (code) => {
   lobby.playerShot = (socket, newShots, tick) => {
     if (socket.clientState !== "in round") return;
     socket.confirmed.set(tick, newShots);
-    for (const player of lobby.players) if (!player.confirmed.has(tick)) return;
+    for (const player of players) if (!player.confirmed.has(tick)) return;
 
     for (const shot of newShots) {
       const killer = getInSocketSet(connected, shot.killer);
@@ -176,7 +188,7 @@ export const newLobby = (code) => {
 
   lobby.clientRoundEnded = (socket) => {
     if (!lobby.stateUpdate(socket, "ending round", "round ended")) return;
-    lobby.players.forEach((player) => {
+    players.forEach((player) => {
       player.isDead = false;
       player.confirmed = new Map();
     });

@@ -31,21 +31,22 @@ export const newColor = (app) => {
     color.team1Path = `oklch(0.90 0.018 ${hue + 45})`;
     color.team2Path = `oklch(0.90 0.018 ${hue - 45})`;
 
-    color.team1Point = `oklch(0.35 0.030 ${hue + 60})`;
-    color.team2Point = `oklch(0.35 0.030 ${hue - 60})`;
+    color.team1Point = `oklch(0.35 0.025 ${hue + 60})`;
+    color.team2Point = `oklch(0.35 0.025 ${hue - 60})`;
 
-    color.intersectPoint1 = `oklch(0.20 0.030 ${hue - 60})`;
-    color.intersectPoint2 = `oklch(0.20 0.030 ${hue + 60})`;
+    color.intersectPoint1 = `oklch(0.25 0.030 ${hue - 60})`;
+    color.intersectPoint2 = `oklch(0.25 0.030 ${hue + 60})`;
 
     color.team1Disk = `oklch(0.75 0.125 ${hue + 45})`;
     color.team2Disk = `oklch(0.75 0.125 ${hue - 45})`;
+    color.objectiveDisk = `oklch(0.75 0.125 ${hue})`;
     color.intersectDisk = `oklch(0.86 0.065 ${hue})`;
 
     color.team1Bullet = `oklch(0.90 0.045 ${hue + 45})`;
     color.team2Bullet = `oklch(0.90 0.045 ${hue - 45})`;
 
-    color.team1Gun = `oklch(0.65 0.110 ${hue + 60})`;
-    color.team2Gun = `oklch(0.65 0.110 ${hue - 60})`;
+    color.team1Gun = `oklch(0.60 0.100 ${hue + 60})`;
+    color.team2Gun = `oklch(0.60 0.100 ${hue - 60})`;
   };
 
   color.setUIByHue = () => {
@@ -57,13 +58,13 @@ export const newColor = (app) => {
     color.inputLeft = `oklch(0.75 0.08 ${hue + 45})`;
     color.inputRight = `oklch(0.75 0.08 ${hue - 45})`;
 
-    color.inputOff = `oklch(0.60 0.05 ${hue})`;
-    color.inputLeftOff = `oklch(0.60 0.05 ${hue + 45})`;
-    color.inputRightOff = `oklch(0.60 0.05 ${hue - 45})`;
+    color.inputOff = `oklch(0.45 0.050 ${hue})`;
+    color.inputLeftOff = `oklch(0.45 0.050 ${hue + 45})`;
+    color.inputRightOff = `oklch(0.45 0.050 ${hue - 45})`;
 
-    color.light = `oklch(0.90 0.035 ${hue})`;
-    color.lightLeft = `oklch(0.90 0.035 ${hue + 45})`;
-    color.lightRight = `oklch(0.90 0.035 ${hue - 45})`;
+    color.light = `oklch(0.90 0.045 ${hue})`;
+    color.lightLeft = `oklch(0.90 0.045 ${hue + 45})`;
+    color.lightRight = `oklch(0.90 0.045 ${hue - 45})`;
 
     updateCSS();
   };

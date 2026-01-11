@@ -1,5 +1,6 @@
 import { createBulletWarpPostFX } from "./bulletwarp.js";
 import { createTeamsVisionRenderer } from "./lightrendering.js";
+import { createPlayerRenderer } from "./playerrendering.js";
 import { animateShot } from "./shootanimation.js";
 
 export const render = (game, team1, team2) => {
@@ -13,7 +14,16 @@ export const render = (game, team1, team2) => {
       mapHeight,
       game.scale
     );
+
+    Object.assign(
+      game,
+      createPlayerRenderer(game.sceneCtx, mapWidth, mapHeight, game.scale)
+    );
   }
+
+  game.color.intersectPoint = game.isTeam1
+    ? game.color.intersectPoint1
+    : game.color.intersectPoint2;
 
   // canvas might change underneath so you can't take this out of render
   const ctx = game.sceneCtx;
@@ -24,37 +34,29 @@ export const render = (game, team1, team2) => {
   ctx.rect(0, 0, mapWidth, mapHeight);
   ctx.fill();
 
-  // draw obstacles
-  let colorIndex = 0;
-  if (game.obstacleRenderGroups) {
-    for (const group of game.obstacleRenderGroups) {
-      ctx.fillStyle =
-        game.choosingObstacle || game.previewingObstacle
-          ? color.obstacleColorBrilliant(colorIndex++)
-          : color.obstacleColor(colorIndex++);
-      ctx.beginPath();
-
-      for (const poly of group) {
-        ctx.moveTo(poly[0][0], poly[0][1]);
-        for (let k = 1; k < poly.length; k++)
-          ctx.lineTo(poly[k][0], poly[k][1]);
-        ctx.closePath();
-      }
-
-      ctx.fill("nonzero");
-    }
-  }
+  drawObstacles(game, ctx, color);
 
   if (game.choosingObstacle || game.previewingObstacle) {
     ctx.fillStyle = color.obstacleColorBrilliant(game.previewObstacle.index);
-    ctx.beginPath();
 
+    ctx.beginPath();
     const { poly } = game.previewObstacle;
     ctx.moveTo(poly[0][0], poly[0][1]);
     for (let k = 1; k < poly.length; k++) ctx.lineTo(poly[k][0], poly[k][1]);
     ctx.closePath();
-
     ctx.fill("nonzero");
+
+    if (game.lightGraph) {
+      game.obstacles.push(game.previewObstacle);
+      game.lightRenderer(
+        game,
+        [], //[...game.team1Lights.values()],
+        [], //[...game.team2Lights.values()],
+        color,
+        renderSettings.glowEnabled
+      );
+      game.obstacles.pop();
+    }
 
     ctx.save();
     ctx.globalAlpha = 0.5;
@@ -64,43 +66,114 @@ export const render = (game, team1, team2) => {
     for (let k = 1; k < previewPoly.length; k++)
       ctx.lineTo(previewPoly[k][0], previewPoly[k][1]);
     ctx.closePath();
-
     ctx.fill("nonzero");
     ctx.restore();
+
+    game.drawPlayer(
+      game.spawn1,
+      playerRadius,
+      color.team1Player,
+      color.team1Gun,
+      Math.atan2(
+        game.spawn2[1] - game.spawn1[1],
+        game.spawn2[0] - game.spawn1[0]
+      ),
+      renderSettings.glowEnabled
+        ? {
+            glowRadius: playerRadius / 1.25,
+            glowColor: color.team1Disk,
+            composite: "hard-light",
+          }
+        : null
+    );
 
     ctx.fillStyle = color.centerObjective;
     ctx.beginPath();
     ctx.arc(...game.centerObjective, playerRadius, 0, Math.PI * 2); // full circle
     ctx.fill();
 
-    ctx.fillStyle = color.team1Player;
-    ctx.beginPath();
-    ctx.arc(...game.spawn1, playerRadius, 0, Math.PI * 2); // full circle
-    ctx.fill();
-
-    ctx.fillStyle = color.team2Player;
-    ctx.beginPath();
-    ctx.arc(...game.spawn2, playerRadius, 0, Math.PI * 2); // full circle
-    ctx.fill();
+    game.drawPlayer(
+      game.spawn2,
+      playerRadius,
+      color.team2Player,
+      color.team2Gun,
+      Math.atan2(
+        game.spawn1[1] - game.spawn2[1],
+        game.spawn1[0] - game.spawn2[0]
+      ),
+      renderSettings.glowEnabled
+        ? {
+            glowRadius: playerRadius / 1.25,
+            glowColor: color.team2Disk,
+            composite: "hard-light",
+          }
+        : null
+    );
 
     game.virtualServer.shots.forEach(
       ({ team1, killerPosition, killedPosition, hit }) => {
-        ctx.strokeStyle = team1 ? color.team1Player : color.team2Player;
+        // ---------------------------------------
+        // Killer: aims at the hit point
+        // ---------------------------------------
+        const killerBodyColor = team1 ? color.team1Player : color.team2Player;
+        const killerGunColor = team1 ? color.team1Gun : color.team2Gun;
+        const killerGlowColor = team1 ? color.team1Disk : color.team2Disk;
+
+        const killerAngle = Math.atan2(
+          hit[1] - killerPosition[1],
+          hit[0] - killerPosition[0]
+        );
+
+        game.drawPlayer(
+          killerPosition,
+          playerRadius,
+          killerBodyColor,
+          killerGunColor,
+          killerAngle,
+          renderSettings.glowEnabled
+            ? {
+                glowRadius: playerRadius / 1.25,
+                glowColor: killerGlowColor,
+                composite: "hard-light",
+              }
+            : null
+        );
+
+        // ---------------------------------------
+        // Killed: aims at the killer
+        // ---------------------------------------
+        const killedBodyColor = team1 ? color.team2Player : color.team1Player;
+        const killedGunColor = team1 ? color.team2Gun : color.team1Gun;
+        const killedGlowColor = team1 ? color.team2Disk : color.team1Disk;
+
+        const killedAngle = Math.atan2(
+          killerPosition[1] - killedPosition[1],
+          killerPosition[0] - killedPosition[0]
+        );
+
+        game.drawPlayer(
+          killedPosition,
+          playerRadius,
+          killedBodyColor,
+          killedGunColor,
+          killedAngle,
+          renderSettings.glowEnabled
+            ? {
+                glowRadius: playerRadius / 1.25,
+                glowColor: killedGlowColor,
+                composite: "hard-light",
+              }
+            : null
+        );
+
+        // draw the shot line
+        ctx.strokeStyle = team1 ? color.team1Gun : color.team2Gun;
         ctx.lineWidth = (2 * playerRadius) / 5;
+        ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(...killerPosition);
         ctx.lineTo(...hit);
         ctx.stroke();
-
-        ctx.fillStyle = team1 ? color.team1Player : color.team2Player;
-        ctx.beginPath();
-        ctx.arc(...killerPosition, playerRadius, 0, Math.PI * 2); // full circle
-        ctx.fill();
-
-        ctx.fillStyle = team1 ? color.team2Player : color.team1Player;
-        ctx.beginPath();
-        ctx.arc(...killedPosition, playerRadius, 0, Math.PI * 2); // full circle
-        ctx.fill();
       }
     );
 
@@ -113,9 +186,11 @@ export const render = (game, team1, team2) => {
   // draw team lights
   if (game.lightGraph) {
     game.lightRenderer(
+      game,
       [...game.team1Lights.values()],
       [...game.team2Lights.values()],
-      color
+      color,
+      renderSettings.glowEnabled
     );
   }
 
@@ -197,12 +272,17 @@ export const render = (game, team1, team2) => {
     const hasAdvantage = game.playerTarget?.[1] ?? false;
     // Base colors
     const playerColor = game.isTeam1 ? color.team1Player : color.team2Player;
-    const gunColorNormal = game.isTeam1 ? color.team2Gun : color.team1Gun;
-    const gunColorSwapped = game.isTeam1 ? color.team1Gun : color.team2Gun;
+    const gunColorNormal = game.isTeam1 ? color.team1Gun : color.team2Gun;
+    const gunColorSwapped = game.isTeam1 ? color.team2Gun : color.team1Gun;
+
     // Swap gun color only when NO advantage
-    const gunColor = hasAdvantage ? gunColorNormal : gunColorSwapped;
-    drawPlayer(
-      ctx,
+    const gunColor = hasAdvantage ? gunColorSwapped : gunColorNormal;
+
+    const glowColorNormal = game.isTeam1 ? color.team1Disk : color.team2Disk;
+    const glowColorSwapped = game.isTeam1 ? color.team2Disk : color.team1Disk;
+    const glowColor = hasAdvantage ? glowColorSwapped : glowColorNormal;
+
+    game.drawPlayer(
       game.playerPosition,
       playerRadius,
       playerColor,
@@ -210,7 +290,14 @@ export const render = (game, team1, team2) => {
       Math.atan2(
         target[1] - game.playerPosition[1],
         target[0] - game.playerPosition[0]
-      )
+      ),
+      renderSettings.glowEnabled
+        ? {
+            glowRadius: playerRadius / 1.25,
+            glowColor: glowColor,
+            composite: "hard-light",
+          }
+        : null
     );
   }
 
@@ -218,51 +305,55 @@ export const render = (game, team1, team2) => {
     const isTeam1 = team1.has(uuid);
 
     // Target + advantage (same semantics as local player)
-    const target = state.target?.[0] || state.iPath[1] || state.iPosition;
+    const target = state.target?.[0] || state.path[1] || state.position;
     const hasAdvantage = state.target?.[1] ?? false;
 
     // Base colors
     const playerColor = isTeam1 ? color.team1Player : color.team2Player;
-    const gunColorNormal = isTeam1 ? color.team2Gun : color.team1Gun;
-    const gunColorSwapped = isTeam1 ? color.team1Gun : color.team2Gun;
+    const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
+    const gunColorSwapped = isTeam1 ? color.team2Gun : color.team1Gun;
 
     // Swap gun color only when NO advantage
-    const gunColor = hasAdvantage ? gunColorNormal : gunColorSwapped;
+    const gunColor = hasAdvantage ? gunColorSwapped : gunColorNormal;
 
-    drawPlayer(
-      ctx,
-      state.iPosition,
+    const glowColorNormal = isTeam1 ? color.team1Disk : color.team2Disk;
+    const glowColorSwapped = isTeam1 ? color.team2Disk : color.team1Disk;
+    const glowColor = hasAdvantage ? glowColorSwapped : glowColorNormal;
+
+    game.drawPlayer(
+      state.position,
       playerRadius,
       playerColor,
       gunColor,
-      Math.atan2(target[1] - state.iPosition[1], target[0] - state.iPosition[0])
+      Math.atan2(target[1] - state.position[1], target[0] - state.position[0]),
+      renderSettings.glowEnabled
+        ? {
+            glowRadius: playerRadius / 1.25,
+            glowColor: glowColor,
+            composite: "hard-light",
+          }
+        : null
     );
   }
 
   //draw objective
   const time = (performance.now() - game.virtualServer.startTime) / 1000;
   const timeAlpha = Math.max(0, (time - 30) / 30) ** 3; // 3 second count in
-  const timeBeta = 1 - timeAlpha;
-  const obstacleRadius =
-    timeBeta * playerRadius + timeAlpha * Math.hypot(mapWidth, mapHeight);
-
-  if (obstacleRadius - playerRadius <= 1e-4) {
-    ctx.fillStyle = color.centerObjective;
-    ctx.beginPath();
-    ctx.arc(...game.centerObjective, playerRadius, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.lineWidth = playerRadius * 2 * timeBeta;
-    ctx.strokeStyle = color.centerObjective;
-    ctx.beginPath();
-    ctx.arc(
-      ...game.centerObjective,
-      obstacleRadius - ctx.lineWidth / 2,
-      0,
-      Math.PI * 2
-    ); // full circle
-    ctx.stroke();
-  }
+  game.drawObjective(
+    game,
+    timeAlpha,
+    playerRadius,
+    mapWidth,
+    mapHeight,
+    color.centerObjective,
+    renderSettings.glowEnabled
+      ? {
+          glowRadius: playerRadius / 1.25,
+          glowColor: color.objectiveDisk,
+          composite: "hard-light",
+        }
+      : null // glowColor defaults to color.centerObjective
+  );
 
   // render shot
   const s = game.scale;
@@ -313,97 +404,24 @@ const newGameCanvases = (game, scale, mapWidth, mapHeight) => {
   return { scene, ctx, output };
 };
 
-export const drawPlayer = (
-  ctx,
-  [cx, cy],
-  playerRadius,
-  color,
-  gun,
-  angle = 0,
-  sliceFrac = 0.2
-) => {
-  // Background (gun)
-  ctx.fillStyle = gun;
-  ctx.beginPath();
-  ctx.arc(cx, cy, playerRadius, 0, 2 * Math.PI);
-  ctx.fill();
+const drawObstacles = (game, ctx, color) => {
+  let colorIndex = 0;
+  if (game.obstacleRenderGroups) {
+    for (const group of game.obstacleRenderGroups) {
+      ctx.fillStyle =
+        game.choosingObstacle || game.previewingObstacle
+          ? color.obstacleColorBrilliant(colorIndex++)
+          : color.obstacleColor(colorIndex++);
+      ctx.beginPath();
 
-  // Clamp
-  sliceFrac = Math.max(0, Math.min(1, sliceFrac));
+      for (const poly of group) {
+        ctx.moveTo(poly[0][0], poly[0][1]);
+        for (let k = 1; k < poly.length; k++)
+          ctx.lineTo(poly[k][0], poly[k][1]);
+        ctx.closePath();
+      }
 
-  const r = playerRadius;
-
-  // Half-thickness of removed strip in local coordinates (diameter = 2r)
-  const w = sliceFrac * r;
-
-  // If no cut -> full circle body + outline
-  if (w <= 0) {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Curvy bit (rotated)
-    const strokeR = r - r / 2.5;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(angle);
-    ctx.lineWidth = (2 * r) / 2.5;
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.arc(0, 0, strokeR, Math.PI / 2, (3 * Math.PI) / 2);
-    ctx.stroke();
-    ctx.restore();
-    return;
+      ctx.fill("nonzero");
+    }
   }
-
-  // If cut removes everything -> draw nothing (gun already drawn)
-  if (w >= r) return;
-
-  // In local frame where removed strip is -w <= y <= w:
-  // Circle intersections with y = ±w occur at x = ±sqrt(r^2 - w^2)
-  const x = Math.sqrt(r * r - w * w);
-
-  // Angle to intersection point on circle: sin(alpha) = w / r
-  const alpha = Math.asin(w / r);
-
-  // Body fill (two caps) in rotated local frame
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(angle);
-
-  ctx.fillStyle = color;
-
-  // 1) Top cap (y >= +w)
-  ctx.beginPath();
-  ctx.arc(0, 0, r, alpha, Math.PI - alpha, false); // CCW
-  ctx.lineTo(x, w);
-  ctx.closePath();
-  ctx.fill();
-
-  // 2) Bottom cap (y <= -w)
-  ctx.beginPath();
-  ctx.arc(0, 0, r, Math.PI + alpha, 2 * Math.PI - alpha, false); // CCW
-  ctx.lineTo(-x, -w);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore();
-
-  // ----------------------------------------------------
-  // Curvy bit (rotated with angle) — draws left semicircle
-  // ----------------------------------------------------
-  const strokeR = r - r * 2 * sliceFrac;
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(angle);
-
-  ctx.lineWidth = 4 * r * sliceFrac;
-  ctx.strokeStyle = color;
-  ctx.beginPath();
-  ctx.arc(0, 0, strokeR, Math.PI / 2, (3 * Math.PI) / 2); // left half in local frame
-  ctx.stroke();
-
-  ctx.restore();
 };

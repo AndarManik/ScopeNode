@@ -10,7 +10,7 @@ export const packState = (uuidToInt, uuid, state) => {
 
   // ticks are int32 now
   if (!Number.isInteger(startTick) || !Number.isInteger(endTick))
-    throw new Error("tick must be [int32, int32]");
+    throw new Error("tick must be [int32, int32]" + [startTick, endTick]);
   // optional: clamp/validate int32 range
   if (startTick < -2147483648 || startTick > 2147483647)
     throw new Error("startTick out of int32 range");

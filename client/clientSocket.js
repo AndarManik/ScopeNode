@@ -61,9 +61,8 @@ export const newSocket = (app) => {
       const data = JSON.parse(message.data);
       if (data.command !== "socket reconnected") return;
       // We have a temp variable here because .send might push into unsentMessages.
-      const tempUnsent = socket.unsentMessages;
+      const tempUnsent = [...socket.lastSentMessages, ...socket.unsentMessages];
       socket.unsentMessages = [];
-      tempUnsent.push(...socket.lastSentMessages);
       tempUnsent.forEach(socket.send);
       hotSocket.removeEventListener("message", reconnectMessage);
     };

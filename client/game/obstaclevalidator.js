@@ -1,4 +1,5 @@
 import "./martinez.min.js";
+import { cloneMultiPoly } from "./martinezutil.js";
 import { pushPathingObstacle } from "./pathing.js";
 // Obstacles are the primary data for two graph based systems.
 // 1. Path planning
@@ -80,6 +81,41 @@ export const validateNewObstacle = (game, obstacle) => {
       return i; // hit
 
   return game.obstacleGroups.length;
+};
+
+export const pushValidObstaclePair = (game, obstacleA, obstacleB) => {
+  // Clone only the fields that pushValidObstacle mutates
+  const tempGame = {
+    // These are safe shallow copies / fresh arrays
+    obstacles: [...game.obstacles],
+    obstacleTotal: cloneMultiPoly(game.obstacleTotal),
+    obstacleGroups: game.obstacleGroups.map(cloneMultiPoly),
+    obstacleRenderGroups: game.obstacleRenderGroups.map((group) => [...group]),
+    obstacleBlockers: game.obstacleBlockers,
+  };
+
+  if (!pushValidObstacle(tempGame, obstacleA)) {
+    console.log("failed first");
+    return false;
+  }
+  if (!pushValidObstacle(tempGame, obstacleB)) {
+    console.log("failed second");
+    return false;
+  }
+
+  if (!pushValidObstacle(game, obstacleA)) {
+    throw new Error(
+      "pushValidObstaclePair: unexpected failure inserting first obstacle"
+    );
+  }
+
+  if (!pushValidObstacle(game, obstacleB)) {
+    throw new Error(
+      "pushValidObstaclePair: unexpected failure inserting second obstacle"
+    );
+  }
+
+  return true;
 };
 
 export const setupObstacleBlockers = (game) => {

@@ -47,12 +47,13 @@ export const newLobbyServer = (webSocketServer) => {
     socket.id = oldSocket.id;
     socket.lobby = oldSocket.lobby;
 
-    socket.json({ command: "socket reconnected" });
     oldSocket.lastSentMessages.forEach((msg) => socket.send(msg));
     console.log("sending " + oldSocket.lastSentMessages.length + " messages");
     oldSocket.unsentMessages.forEach((msg) => socket.send(msg));
     console.log("sending " + oldSocket.unsentMessages.length + " messages");
     socket.lobby?.awakeConnection(oldSocket, socket);
+
+    socket.json({ command: "socket reconnected" });
   };
 
   lobbyServer.leaveLobby = (socket) => {

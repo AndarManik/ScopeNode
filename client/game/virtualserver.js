@@ -1,19 +1,16 @@
 import { packState, unpackState } from "./binary.js";
 import { registerHit } from "./hitreg.js";
 
-let count = 0;
-const VTICK = 64;
 export const newVirtualServer = (game, app, team1, team2) => {
-  count++;
   const { socket, stats } = app;
-  let HZ = 64;
+  let HZ = 32;
 
   const all = [...team1, ...team2];
   all.sort();
   const allInv = {};
   all.forEach((uuid, index) => (allInv[uuid] = index));
 
-  const localHistory = [buildInitialState(game, all, team1, game.userId)];
+  const localHistory = [];
 
   const globalDead = new Set();
   const globalStates = new Map();
@@ -21,13 +18,12 @@ export const newVirtualServer = (game, app, team1, team2) => {
 
   const shots = new Set();
 
-  const virtualServer = { globalStates, shots };
+  const virtualServer = { globalStates, shots, isStopped: true };
 
   all.forEach((uuid) => {
     if (uuid === game.userId) return;
-    const state = buildInitialState(game, all, team1, uuid);
-    globalStates.set(uuid, state);
-    globalHistories.set(uuid, [state]);
+    globalStates.set(uuid, buildInitialState(game, all, team1, uuid));
+    globalHistories.set(uuid, []);
   });
 
   // idempotent
@@ -39,13 +35,15 @@ export const newVirtualServer = (game, app, team1, team2) => {
     const userHistory = globalHistories.get(uuid);
     const n = userHistory.length;
     if (n === 0) {
-      globalStates.set(uuid, state);
+      Object.assign(globalStates.get(uuid), structuredClone(state));
+      globalStates.get(uuid).seen = false;
       userHistory.push(state);
       return;
     }
     const lastTick = userHistory[n - 1].tick[1];
     if (lastTick < tick) {
-      globalStates.set(uuid, state);
+      Object.assign(globalStates.get(uuid), structuredClone(state));
+      globalStates.get(uuid).seen = false;
       userHistory.push(state);
       return;
     }
@@ -66,55 +64,47 @@ export const newVirtualServer = (game, app, team1, team2) => {
   const invalpha = 1 - alpha;
 
   let tick = 0;
+  let headroomExp = 0;
   let lamportExp = 0;
   let speculExp = 0;
-  let headroomExp = 0;
   let stretchExp = 0;
   let expAvg = 0;
-
-  let lStretch = true;
-  let sStretch = true;
-  let hStretch = true;
-  const nextTick = () => {
+  virtualServer.nextTick = () => {
     if (game.isDead) return;
     if (virtualServer.isStopped) return;
 
-    const startTick = ++tick;
-    const lamportTick = getLamportTick(startTick);
-    lamportExp = invalpha * lamportExp + alpha * (lamportTick - startTick);
+    const headroomTick = getHeadroomTick();
+    if (headroomTick) {
+      const startTick = tick + 1;
+      const lamportTick = getLamportTick(startTick);
+      const speculativeTick = getSpeculativeTick(startTick);
+      tick = Math.max(lamportTick, speculativeTick) + headroomTick - 1;
 
-    const speculativeTick = getSpeculativeTick(startTick);
-    speculExp = invalpha * speculExp + alpha * (speculativeTick - startTick);
+      lamportExp = invalpha * lamportExp + alpha * (lamportTick - startTick);
+      speculExp = invalpha * speculExp + alpha * (speculativeTick - startTick);
+      headroomExp = invalpha * headroomExp + alpha * headroomTick;
+      stretchExp = invalpha * stretchExp + alpha * (tick - startTick);
 
-    if (lStretch && tick < lamportTick) tick = lamportTick;
-    if (sStretch && tick < speculativeTick) tick = speculativeTick;
+      const vector = [];
+      for (const [uuid, { tick }] of globalStates.entries())
+        vector.push([uuid, tick[0]]);
 
-    // this comes after l and s because we want to add it ontop
-    const headroomTick = getHeadroomTick(tick);
-    headroomExp = invalpha * headroomExp + alpha * (headroomTick - tick);
-    if (hStretch && tick < headroomTick) tick = headroomTick;
+      const time = performance.now() - virtualServer.startTime;
 
-    stretchExp = invalpha * stretchExp + alpha * (tick - startTick);
+      const localState = {
+        tick: [startTick, tick],
+        vector,
+        position: [...game.playerPosition],
+        path: game.preRound ? [] : game.path,
+        light: [game.playerLight[0], game.playerLight[1]],
+        time,
+      };
 
-    const vector = [];
-    for (const [uuid, { tick }] of globalStates.entries())
-      vector.push([uuid, tick[0]]);
+      if (!game.playerIsDead) localHistory.push(localState);
 
-    const time = performance.now() - virtualServer.startTime;
-
-    const localState = {
-      tick: [startTick, tick],
-      vector,
-      position: [...game.playerPosition],
-      path: game.preRound ? [] : game.path,
-      light: [game.playerLight[0], game.playerLight[1]],
-      time,
-    };
-
-    if (!game.playerIsDead) localHistory.push(localState);
-
-    if (!game.playerIsDead && game.isMultiPlayer)
-      socket.send(packState(allInv, game.userId, localState));
+      if (!game.playerIsDead && game.isMultiPlayer)
+        socket.send(packState(allInv, game.userId, localState));
+    }
 
     while (processHistory());
 
@@ -123,11 +113,19 @@ export const newVirtualServer = (game, app, team1, team2) => {
 
     const log = stats.log;
     log.set("PING", (expAvg * 1000) / (HZ * (1 + stretchExp)));
-    log.set("L vTick", HZ * (1 + lamportExp));
-    log.set("S vTick", HZ * (1 + speculExp));
-    log.set("H vTick", HZ * (1 + headroomExp));
+    log.set("L vTick", HZ * lamportExp);
+    log.set("S vTick", HZ * speculExp);
+    log.set("H vTick", HZ * headroomExp);
     log.set("T vTick", HZ * (1 + stretchExp));
-    setTimeout(nextTick, 1000 / HZ);
+  };
+
+  let lastHeadroomTime;
+  const getHeadroomTick = () => {
+    const now = performance.now();
+    const headroomLag = (now - lastHeadroomTime) / (1000 / HZ);
+    if (Math.random() > headroomLag) return 0;
+    lastHeadroomTime = now;
+    return Math.max(1, Math.round(headroomLag));
   };
 
   const getLamportTick = (lamportTick) => {
@@ -155,21 +153,10 @@ export const newVirtualServer = (game, app, team1, team2) => {
 
     speculativeLag = Math.floor(speculativeLag / globalStates.size);
     lastSpeculativeTick = speculativeTick + speculativeLag;
-
     return speculativeTick + speculativeLag;
   };
 
-  let lastHeadroomTime = Number.MAX_VALUE;
-  const getHeadroomTick = (headroomTick) => {
-    const now = performance.now();
-    const headroomLag = (now - lastHeadroomTime) / (1000 / VTICK) - 1;
-    lastHeadroomTime = now;
-    if (headroomLag < 0) return headroomTick;
-    if (headroomLag < 1) return headroomTick + (Math.random() < headroomLag);
-    return headroomTick + Math.round(headroomLag);
-  };
-
-  let processedTick = 0;
+  let processedTick = 1;
   const processHistory = () => {
     // Make sure each clients start tick is before or at proccessedTick
     if (
@@ -291,13 +278,6 @@ export const newVirtualServer = (game, app, team1, team2) => {
   };
 
   const killPlayer = (shot) => {
-    console.log(
-      "player killed",
-      count,
-      shot.killerPosition,
-      shot.killedPosition,
-      tick
-    );
     shots.add(shot);
     if (shot.killed === game.userId) {
       localHistory.length = 0;
@@ -311,13 +291,9 @@ export const newVirtualServer = (game, app, team1, team2) => {
 
   virtualServer.start = () => {
     virtualServer.startTime = performance.now();
-    nextTick();
+    lastHeadroomTime = virtualServer.startTime;
+    virtualServer.isStopped = false;
   };
-
-  window.HZ = (hz) => (HZ = hz);
-  window.L = () => (lStretch = !lStretch);
-  window.S = () => (sStretch = !sStretch);
-  window.H = () => (hStretch = !hStretch);
 
   return virtualServer;
 };

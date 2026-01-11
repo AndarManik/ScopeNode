@@ -86,29 +86,72 @@ export const newMenu = (app) => {
 
   menu.newEl = (x, y, width, height, type = "div") => {
     const element = document.createElement(type);
-    if (type == "div") {
+    if (type === "div") {
       element.className = "grid-item";
       element.style.backgroundColor = "var(--light)";
     }
+
     element.style.gridColumn = `${x} / span ${width}`;
     element.style.gridRow = `${y} / span ${height}`;
-    for (let H = 0; H < height; H++)
-      for (let W = 0; W < width; W++)
-        fillers.get((y + H) * cols + (x + W)).style.display = "none";
     element.fillerSize = { x, y, width, height };
-    menuEl.appendChild(element);
-    menuChildrenEls.add(element);
+
+    // Compute the grid-rect bounds
+    const xEnd = x + width - 1;
+    const yEnd = y + height - 1;
+
+    // If completely outside the menu grid, don't append or touch fillers.
+    // Still return the element so callers can keep references if they want.
+    const fullyOffGrid = x > cols || xEnd < 1 || y > rows || yEnd < 1;
+
+    if (!fullyOffGrid) {
+      // Only track + append when actually on-grid in some way
+      menuEl.appendChild(element);
+      menuChildrenEls.add(element);
+
+      // Hide underlying fillers, but only within bounds
+      for (let H = 0; H < height; H++) {
+        const gy = y + H;
+        if (gy < 1 || gy > rows) continue;
+
+        for (let W = 0; W < width; W++) {
+          const gx = x + W;
+          if (gx < 1 || gx > cols) continue;
+
+          const filler = fillers.get(gy * cols + gx);
+          if (filler) filler.style.display = "none";
+        }
+      }
+    }
 
     return element;
   };
 
   menu.renewEl = (element) => {
-    if (!element.fillerSize) return;
+    if (!element.fillerSize) return null;
     const { x, y, width, height } = element.fillerSize;
-    for (let H = 0; H < height; H++)
-      for (let W = 0; W < width; W++)
-        fillers.get((y + H) * cols + (x + W)).style.display = "none";
-    element.fillerSize = { x, y, width, height };
+
+    const xEnd = x + width - 1;
+    const yEnd = y + height - 1;
+
+    // If region is completely off-grid, don't bother re-adding
+    if (y > rows || yEnd < 1 || x > cols || xEnd < 1) {
+      return null;
+    }
+
+    // Re-hide underlying fillers with bounds checks
+    for (let H = 0; H < height; H++) {
+      const gy = y + H;
+      if (gy < 1 || gy > rows) continue;
+
+      for (let W = 0; W < width; W++) {
+        const gx = x + W;
+        if (gx < 1 || gx > cols) continue;
+
+        const filler = fillers.get(gy * cols + gx);
+        if (filler) filler.style.display = "none";
+      }
+    }
+
     menuEl.appendChild(element);
     menuChildrenEls.add(element);
 
@@ -120,10 +163,25 @@ export const newMenu = (app) => {
 
     menuEl.removeChild(element);
     menuChildrenEls.delete(element);
+
+    if (!element.fillerSize) return;
+
     const { x, y, width, height } = element.fillerSize;
-    for (let H = 0; H < height; H++)
-      for (let W = 0; W < width; W++)
-        fillers.get((y + H) * cols + (x + W)).style.display = "flex";
+
+    // Re-show fillers with bounds checks
+    for (let H = 0; H < height; H++) {
+      const gy = y + H;
+      if (gy < 1 || gy > rows) continue;
+
+      for (let W = 0; W < width; W++) {
+        const gx = x + W;
+        if (gx < 1 || gx > cols) continue;
+
+        const filler = fillers.get(gy * cols + gx);
+        if (filler) filler.style.display = "flex";
+      }
+    }
+
     fillers.forEach(setFillerColor);
   };
 

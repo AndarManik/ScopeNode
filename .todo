@@ -1,6 +1,8 @@
 [ ] finalize lobby join exit reconnect
 [ ] rework main main
-[ ] settings
+[X] settings
+
+[ ] WASD and mobile input
 
 [X] optimize pathing
 [ ] reimplement visibility graph
@@ -9,3 +11,7 @@
 
 [ ] add tutorial puzzles
 [ ] implement single player AI
+
+-Small things
+[X] Sync virtual server with game engine tick
+[X] add symetry to obstacle initialization
