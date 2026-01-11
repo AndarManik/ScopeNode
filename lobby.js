@@ -104,7 +104,7 @@ export const newLobby = (code) => {
     if (lobby.inGame) return;
     lobby.inGame = true;
 
-    const toWinMap = { small: 3, medium: 5, large: 7 };
+    const toWinMap = { small: 4, medium: 6, large: 8 };
     lobby.toWin = toWinMap[lobby.mapSize];
     lobby.score = [0, 0];
 
