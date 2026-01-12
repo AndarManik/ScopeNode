@@ -163,7 +163,9 @@ export function registerTarget(shooter, enemies, radius) {
     ? Math.sqrt(enemyPointDist) > radius
     : Math.sqrt(enemyPointDist) - Math.sqrt(enemyBodyDist) > radius;
 
-  return [target, shooterAdvantage && !targetAdvantage];
+  const targetClose = Math.sqrt(enemyBodyDist) < radius * 8;
+
+  return [targetClose ? target : null, shooterAdvantage && !targetAdvantage];
 }
 
 /** Closest point to union of bodyPolys (min over polys). */

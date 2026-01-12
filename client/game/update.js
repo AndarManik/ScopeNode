@@ -81,11 +81,23 @@ export const update = (game, app, delta, team1, team2) => {
 
       if (!rawTarget) {
         // No target: clear smoothing and unset
-        clearTargetSmoothing(state);
-        state.target = undefined;
+        const fallBackTarget = state.path[1] || state.position;
+        const smoothedPos = smoothTargetPos(
+          state,
+          state.position,
+          fallBackTarget,
+          delta
+        );
+        state.target = [smoothedPos, false];
       } else {
         const [desiredPos, hasAdvantage] = rawTarget;
-        const smoothedPos = smoothTargetPos(state, desiredPos, delta);
+        const fallBackTarget = desiredPos || state.path[1] || state.position;
+        const smoothedPos = smoothTargetPos(
+          state,
+          state.position,
+          fallBackTarget,
+          delta
+        );
         // Keep the bool as-is, smooth only the position
         state.target = [smoothedPos, hasAdvantage];
       }
@@ -101,11 +113,23 @@ export const update = (game, app, delta, team1, team2) => {
       const rawTarget = registerTarget(shooter, enemies, playerRadius);
 
       if (!rawTarget) {
-        clearTargetSmoothing(game); // use same helper, works on any object
-        game.playerTarget = undefined;
+        const fallBackTarget = game.path[1] || game.mouse;
+        const smoothedPos = smoothTargetPos(
+          game,
+          game.playerPosition,
+          fallBackTarget,
+          delta
+        );
+        game.playerTarget = [smoothedPos, false];
       } else {
         const [desiredPos, hasAdvantage] = rawTarget;
-        const smoothedPos = smoothTargetPos(game, desiredPos, delta);
+        const fallBackTarget = desiredPos || game.path[1] || game.mouse;
+        const smoothedPos = smoothTargetPos(
+          game,
+          game.playerPosition,
+          fallBackTarget,
+          delta
+        );
         game.playerTarget = [smoothedPos, hasAdvantage];
       }
     }
@@ -117,37 +141,51 @@ export const update = (game, app, delta, team1, team2) => {
   }
 };
 
-function smoothTargetPos(state, desiredPos, delta) {
-  if (!desiredPos) return desiredPos;
-  // Initialize on first use
-  if (!state._smoothedTargetPos) {
-    state._smoothedTargetPos = [...desiredPos];
-    state._smoothedTargetVel = [0, 0];
-    return state._smoothedTargetPos;
-  }
-
-  const pos = state._smoothedTargetPos;
-  const vel = state._smoothedTargetVel;
-
-  // Spring parameters (tweak to taste)
-  // Higher stiffness = faster response; keep damping = 2*sqrt(stiffness) for critical damping
-  const stiffness = 300; // 1/s^2
-  const damping = 2 * Math.sqrt(stiffness);
-
-  const dx = desiredPos[0] - pos[0];
-  const dy = desiredPos[1] - pos[1];
-
-  // Critically damped spring
-  vel[0] += (dx * stiffness - vel[0] * damping) * delta;
-  vel[1] += (dy * stiffness - vel[1] * damping) * delta;
-
-  pos[0] += vel[0] * delta;
-  pos[1] += vel[1] * delta;
-
-  return pos;
+function shortestAngleDelta(target, current) {
+  let diff = target - current;
+  if (diff > Math.PI) diff -= 2 * Math.PI;
+  else if (diff < -Math.PI) diff += 2 * Math.PI;
+  return diff;
 }
 
-function clearTargetSmoothing(state) {
-  state._smoothedTargetPos = undefined;
-  state._smoothedTargetVel = undefined;
+export function smoothTargetPos(state, pos, desiredPos, delta) {
+  if (!desiredPos) return state._smoothedTargetAngle ?? 0;
+
+  if (desiredPos[0] === pos[0] && desiredPos[1] === pos[1])
+    return state._smoothedTargetAngle;
+
+  // Desired direction from current position to target
+  const desiredAngle = Math.atan2(
+    desiredPos[1] - pos[1],
+    desiredPos[0] - pos[0]
+  );
+
+  // Initialize on first use
+  if (state._smoothedTargetAngle == null) {
+    state._smoothedTargetAngle = desiredAngle;
+    state._smoothedTargetAngularVel = 0;
+    return desiredAngle;
+  }
+
+  let angle = state._smoothedTargetAngle;
+  let vel = state._smoothedTargetAngularVel || 0;
+
+  // Critically damped spring in 1D (angle space)
+  const stiffness = 1000; // tweak to taste
+  const damping = 2 * Math.sqrt(stiffness);
+
+  const error = shortestAngleDelta(desiredAngle, angle);
+
+  vel += (error * stiffness - vel * damping) * delta;
+
+  angle += vel * delta;
+
+  // Keep angle in [-PI, PI] for stability
+  if (angle > Math.PI) angle -= 2 * Math.PI;
+  else if (angle < -Math.PI) angle += 2 * Math.PI;
+
+  state._smoothedTargetAngle = angle;
+  state._smoothedTargetAngularVel = vel;
+
+  return angle;
 }

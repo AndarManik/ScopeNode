@@ -268,8 +268,8 @@ export const render = (game, team1, team2) => {
     ctx.restore();
 
     // draw player
-    const target = game.playerTarget?.[0] || game.path[1] || game.mouse;
-    const hasAdvantage = game.playerTarget?.[1] ?? false;
+    const target = game.playerTarget[0];
+    const hasAdvantage = game.playerTarget[1];
     // Base colors
     const playerColor = game.isTeam1 ? color.team1Player : color.team2Player;
     const gunColorNormal = game.isTeam1 ? color.team1Gun : color.team2Gun;
@@ -287,10 +287,7 @@ export const render = (game, team1, team2) => {
       playerRadius,
       playerColor,
       gunColor,
-      Math.atan2(
-        target[1] - game.playerPosition[1],
-        target[0] - game.playerPosition[0]
-      ),
+      target,
       renderSettings.glowEnabled
         ? {
             glowRadius: playerRadius / 1.25,
@@ -305,8 +302,8 @@ export const render = (game, team1, team2) => {
     const isTeam1 = team1.has(uuid);
 
     // Target + advantage (same semantics as local player)
-    const target = state.target?.[0] || state.path[1] || state.position;
-    const hasAdvantage = state.target?.[1] ?? false;
+    const target = state.target[0];
+    const hasAdvantage = state.target[1];
 
     // Base colors
     const playerColor = isTeam1 ? color.team1Player : color.team2Player;
@@ -325,7 +322,7 @@ export const render = (game, team1, team2) => {
       playerRadius,
       playerColor,
       gunColor,
-      Math.atan2(target[1] - state.position[1], target[0] - state.position[0]),
+      target,
       renderSettings.glowEnabled
         ? {
             glowRadius: playerRadius / 1.25,
