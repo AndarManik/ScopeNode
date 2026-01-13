@@ -1,5 +1,6 @@
 import {
   confirmPreviewObstacle,
+  forceDropNewObstacle,
   initializeObstacles,
   initializeReceivedObstacles,
   receivePreviewObstacle,
@@ -98,9 +99,11 @@ export const newGame = (app, options, team1, team2) => {
           hugeText.style.opacity = 0.9;
           hugeText.style.fontSize = "512px";
           hugeText.innerText = text;
+          setTimeout(() => {
+            hugeText.classList.add("fading-out");
+            hugeText.style.opacity = 0;
+          }, 250);
           if (text !== "GO") return;
-          hugeText.classList.add("fading-out");
-          hugeText.style.opacity = 0;
           game.preRound = false;
         }, i * 1000);
       });
@@ -141,6 +144,27 @@ export const newGame = (app, options, team1, team2) => {
 
     game.startChoosingObstacle = () => {
       game.choosingObstacle = true;
+      const total = 20000;
+      const countdowns = [10, 5, 3, 2, 1];
+      countdowns.forEach((secLeft) => {
+        const ms = total - secLeft * 1000;
+        setTimeout(() => {
+          // Show the number
+          if (!game.choosingObstacle) return;
+          hugeText.classList.remove("fading-out");
+          hugeText.style.opacity = 0.9;
+          hugeText.style.fontSize = "512px";
+          hugeText.innerText = secLeft;
+          setTimeout(() => {
+            hugeText.classList.add("fading-out");
+            hugeText.style.opacity = 0;
+          }, 250);
+        }, ms);
+      });
+
+      game.forceDrop = setTimeout(() => {
+        forceDropNewObstacle(game, app.socket);
+      }, total);
     };
 
     game.confirmPreviewObstacle = (obstacle) => {

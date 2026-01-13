@@ -60,7 +60,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
     userHistory.splice(low, 0, state);
   };
 
-  const alpha = 0.1;
+  const alpha = 0.05;
   const invalpha = 1 - alpha;
 
   let tick = 0;
@@ -108,15 +108,16 @@ export const newVirtualServer = (game, app, team1, team2) => {
 
     while (processHistory());
 
-    const lag = tick - (localHistory[0]?.tick[0] || tick);
+    const lag =
+      (localHistory[localHistory.length - 1]?.time ?? 0) -
+      (localHistory[0]?.time ?? 0);
     expAvg = invalpha * expAvg + alpha * lag;
 
     const log = stats.log;
-    log.set("PING", (expAvg * 1000) / (HZ * (1 + stretchExp)));
-    log.set("L vTick", HZ * lamportExp);
-    log.set("S vTick", HZ * speculExp);
-    log.set("H vTick", HZ * headroomExp);
-    log.set("T vTick", HZ * (1 + stretchExp));
+    log.set("PING", expAvg);
+    log.set("vTick| ", HZ * (1 + stretchExp));
+    log.set("vTick|H", HZ * headroomExp);
+    log.set("vTick|S", HZ * (speculExp + headroomExp));
   };
 
   let lastHeadroomTime;

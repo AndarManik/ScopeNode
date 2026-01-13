@@ -19,7 +19,7 @@ export const newStats = (app) => {
 
   const historyLen = Math.max(2, Math.ceil(HISTORY_MS / SAMPLE_MS));
 
-  // key -> entry
+  // groupKey -> entry
   const entries = new Map();
 
   // ====== visibility toggle (hotkey "3") ======
@@ -65,14 +65,25 @@ export const newStats = (app) => {
     wrapperPool.push(w);
   };
 
-  const makeEntry = (key) => {
+  // Parse "group|series" → { groupKey, seriesKey }
+  // If there is no "|", we treat it as group=key, series="value".
+  const parseKey = (rawKey) => {
+    const idx = rawKey.indexOf("|");
+    if (idx === -1) return { groupKey: rawKey, seriesKey: "value" };
+    return {
+      groupKey: rawKey.slice(0, idx),
+      seriesKey: rawKey.slice(idx + 1) || "value",
+    };
+  };
+
+  const makeEntry = (groupKey) => {
     const wrapper = obtainWrapper();
     wrapper.style.display = "flex";
     wrapper.style.flexDirection = "column";
     wrapper.style.alignItems = "flex-start";
 
     const label = document.createElement("div");
-    label.style.fontSize = "16px";
+    label.style.fontSize = "14px";
 
     const canvas = document.createElement("canvas");
 
@@ -94,45 +105,51 @@ export const newStats = (app) => {
     // Draw in CSS-pixel coordinates, scaled into the backing store.
     ctx.setTransform(CANVAS_SCALE, 0, 0, CANVAS_SCALE, 0, 0);
 
-    // ring buffer
-    const buf = new Float32Array(historyLen);
-    entries.set(key, {
-      key,
+    const entry = {
+      key: groupKey,
       wrapper,
       label,
       canvas,
       ctx,
-      buf,
-      head: 0,
-      size: 0,
-      lastValue: 0,
-    });
+      // seriesKey -> { name, buf, head, size, lastValue }
+      series: new Map(),
+    };
+
+    entries.set(groupKey, entry);
+    return entry;
   };
 
-  const removeEntry = (key) => {
-    const entry = entries.get(key);
+  const removeEntry = (groupKey) => {
+    const entry = entries.get(groupKey);
     if (!entry) return;
     entry.wrapper.remove();
     releaseWrapper(entry.wrapper);
-    entries.delete(key);
+    entries.delete(groupKey);
   };
 
   const pruneMissing = () => {
+    // Build set of groupKeys that are still referenced in stats.log
+    const liveGroups = new Set();
+    for (const rawKey of stats.log.keys()) {
+      const { groupKey } = parseKey(rawKey);
+      liveGroups.add(groupKey);
+    }
+
     for (const key of entries.keys()) {
-      if (!stats.log.has(key)) removeEntry(key);
+      if (!liveGroups.has(key)) removeEntry(key);
     }
   };
 
-  const sampleIntoRing = (entry, value) => {
-    entry.lastValue = value;
+  const sampleIntoRing = (series, value) => {
+    series.lastValue = value;
 
-    entry.buf[entry.head] = value;
-    entry.head = (entry.head + 1) % historyLen;
-    if (entry.size < historyLen) entry.size++;
+    series.buf[series.head] = value;
+    series.head = (series.head + 1) % historyLen;
+    if (series.size < historyLen) series.size++;
   };
 
   const drawGraph = (entry) => {
-    const { ctx, canvas, buf, head, size } = entry;
+    const { ctx, canvas, series } = entry;
 
     const EMA_ALPHA = 0.18;
     const ROBUST_RANGE = true;
@@ -143,30 +160,44 @@ export const newStats = (app) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(CANVAS_SCALE, 0, 0, CANVAS_SCALE, 0, 0);
 
-    if (size < 2) return;
+    // Need at least one series with >=2 samples
+    let hasData = false;
+    for (const s of series.values()) {
+      if (s.size >= 2) {
+        hasData = true;
+        break;
+      }
+    }
+    if (!hasData) return;
 
-    const oldest = size === historyLen ? head : 0;
-
-    // range
+    // Compute min/max over all series
     let min = Infinity;
     let max = -Infinity;
 
-    // Welford mean/std
+    // Welford mean/std over all series
     let mean = 0;
     let m2 = 0;
     let n = 0;
 
-    for (let i = 0; i < size; i++) {
-      const v = buf[(oldest + i) % historyLen];
+    for (const s of series.values()) {
+      const { buf, size, head } = s;
+      if (size === 0) continue;
+      const oldest = size === historyLen ? head : 0;
 
-      if (v < min) min = v;
-      if (v > max) max = v;
+      for (let i = 0; i < size; i++) {
+        const v = buf[(oldest + i) % historyLen];
 
-      n++;
-      const d = v - mean;
-      mean += d / n;
-      m2 += d * (v - mean);
+        if (v < min) min = v;
+        if (v > max) max = v;
+
+        n++;
+        const d = v - mean;
+        mean += d / n;
+        m2 += d * (v - mean);
+      }
     }
+
+    if (n === 0) return;
 
     if (ROBUST_RANGE && n > 2) {
       const variance = m2 / (n - 1);
@@ -201,35 +232,47 @@ export const newStats = (app) => {
     };
 
     const denom = Math.max(1, historyLen - 1);
-    const start = historyLen - size;
 
-    let ema = buf[oldest];
-    let started = false;
+    // Draw each series in insertion order (no sort)
+    const seriesNames = Array.from(series.keys());
 
-    ctx.strokeStyle = lineColor;
-    ctx.globalAlpha = 0.65;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.beginPath();
+    seriesNames.forEach((name, idx) => {
+      const s = series.get(name);
+      if (!s || s.size < 2) return;
 
-    for (let i = 0; i < size; i++) {
-      const v = buf[(oldest + i) % historyLen];
-      ema = ema + EMA_ALPHA * (v - ema);
+      const { buf, size, head } = s;
+      const oldest = size === historyLen ? head : 0;
+      const start = historyLen - size;
 
-      const slot = start + i;
-      const x = (slot / denom) * CANVAS_W;
-      const y = toY(ema);
+      let ema = buf[oldest];
+      let started = false;
 
-      if (!started) {
-        ctx.moveTo(x, y);
-        started = true;
-      } else {
-        ctx.lineTo(x, y);
+      ctx.strokeStyle = lineColor;
+      ctx.globalAlpha = 0.5 + 0.15 * Math.min(idx, 3); // dimmer for later series
+      ctx.lineWidth = idx === 0 ? 2 : 1.5;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.beginPath();
+
+      for (let i = 0; i < size; i++) {
+        const v = buf[(oldest + i) % historyLen];
+        ema = ema + EMA_ALPHA * (v - ema);
+
+        const slot = start + i;
+        const x = (slot / denom) * CANVAS_W;
+        const y = toY(ema);
+
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
       }
-    }
 
-    ctx.stroke();
+      ctx.stroke();
+    });
+
     ctx.globalAlpha = 1;
   };
 
@@ -242,13 +285,25 @@ export const newStats = (app) => {
       return;
     }
 
-    for (const [key, value] of stats.log.entries()) {
-      let entry = entries.get(key);
-      if (!entry) {
-        makeEntry(key);
-        entry = entries.get(key);
+    for (const [rawKey, value] of stats.log.entries()) {
+      const { groupKey, seriesKey } = parseKey(rawKey);
+
+      let entry = entries.get(groupKey);
+      if (!entry) entry = makeEntry(groupKey);
+
+      let s = entry.series.get(seriesKey);
+      if (!s) {
+        s = {
+          name: seriesKey,
+          buf: new Float32Array(historyLen),
+          head: 0,
+          size: 0,
+          lastValue: value,
+        };
+        entry.series.set(seriesKey, s);
       }
-      sampleIntoRing(entry, value);
+
+      sampleIntoRing(s, value);
     }
 
     pruneMissing();
@@ -263,7 +318,6 @@ export const newStats = (app) => {
     }
 
     // in case --light changes while shown, but without per-point reads
-    // (this is cheap; keep it here if you want the graph color to react quickly)
     refreshCSS();
 
     for (const entry of entries.values()) drawGraph(entry);
@@ -278,14 +332,30 @@ export const newStats = (app) => {
       return;
     }
 
-    // If you prefer color updates to be slow (instead of graphTick),
-    // move refreshCSS() here and remove it from graphTick.
-    // refreshCSS();
-
     for (const entry of entries.values()) {
-      entry.label.textContent = `${entry.key}: ${
-        Math.round(10 * entry.lastValue) / 10
-      }`;
+      const seriesKeys = Array.from(entry.series.keys()); // insertion order
+
+      if (seriesKeys.length === 0) {
+        entry.label.textContent = `${entry.key}:`;
+        continue;
+      }
+
+      // Single unnamed series ("value") → show just the number.
+      if (seriesKeys.length === 1 && seriesKeys[0] === "value") {
+        const s = entry.series.get("value");
+        const v = s ? s.lastValue : 0;
+        const r = Math.round(10 * v) / 10;
+        entry.label.textContent = `${entry.key}: ${r}`;
+      } else {
+        // Multi-series or named single-series → "name value" parts in insertion order.
+        const parts = seriesKeys.map((name) => {
+          const s = entry.series.get(name);
+          const v = s ? s.lastValue : 0;
+          const r = Math.round(10 * v) / 10;
+          return `${name} ${r}`;
+        });
+        entry.label.textContent = `${entry.key}: ${parts[0]}`;
+      }
     }
 
     setTimeout(renderTick, RENDER_MS);

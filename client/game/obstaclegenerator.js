@@ -7,32 +7,17 @@
 // 2. approximating circle boundary at vertices
 
 export const generateObstacle = (
-  game,
+  { playerRadius, obstacleArea, minkowskiDeg, minObstacleDeg },
   position = [0, 0],
   angle = Math.PI * 2 * Math.random(),
   alpha = Math.random()
 ) => {
-  const area = (game.obstacleArea * game.playerRadius) ** 2;
-  const minDeg = game.minObstacleDeg;
-  const triangle = spawnTriangleCentered(alpha, area, minDeg);
-
-  const rotatedTriangle = transformPoints(position, angle, triangle);
-
-  const mTriangle = minkowskiSum(
-    rotatedTriangle,
-    game.playerRadius,
-    game.minkowskiDeg
-  );
-  const mDoubleTriangle = minkowskiSum(
-    rotatedTriangle,
-    2 * game.playerRadius,
-    game.minkowskiDeg / 4
-  );
-  return {
-    poly: rotatedTriangle,
-    pathPoly: mTriangle,
-    previewPoly: mDoubleTriangle,
-  };
+  const area = (obstacleArea * playerRadius) ** 2;
+  const triangle = spawnTriangleCentered(alpha, area, minObstacleDeg);
+  const poly = transformPoints(position, angle, triangle);
+  const pathPoly = minkowskiSum(poly, playerRadius, minkowskiDeg);
+  const previewPoly = minkowskiSum(poly, 2 * playerRadius, minkowskiDeg / 4);
+  return { poly, pathPoly, previewPoly, position, angle, alpha };
 };
 
 // rotates around[0,0]
