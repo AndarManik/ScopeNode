@@ -336,21 +336,22 @@ export const render = (game, team1, team2) => {
   //draw objective
   const time = (performance.now() - game.virtualServer.startTime) / 1000;
   const timeAlpha = Math.max(0, (time - 30) / 30) ** 3; // 3 second count in
-  game.drawObjective(
-    game,
-    timeAlpha,
-    playerRadius,
-    mapWidth,
-    mapHeight,
-    color.centerObjective,
-    renderSettings.glowEnabled
-      ? {
-          glowRadius: playerRadius / 1.25,
-          glowColor: color.objectiveDisk,
-          composite: "hard-light",
-        }
-      : null // glowColor defaults to color.centerObjective
-  );
+  if (timeAlpha < 1)
+    game.drawObjective(
+      game,
+      timeAlpha,
+      playerRadius,
+      mapWidth,
+      mapHeight,
+      color.centerObjective,
+      renderSettings.glowEnabled
+        ? {
+            glowRadius: playerRadius / 1.25,
+            glowColor: color.objectiveDisk,
+            composite: "hard-light",
+          }
+        : null // glowColor defaults to color.centerObjective
+    );
 
   // render shot
   const s = game.scale;

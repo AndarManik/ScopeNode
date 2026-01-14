@@ -61,7 +61,6 @@ export const newKeyBoard = (game) => {
     if (e.code === "ControlLeft" || e.code === "ControlRight")
       keyboard.ctrl = true;
   };
-  document.addEventListener("keydown", keydown);
 
   const keyup = (e) => {
     if (game.isDead) document.removeEventListener("keyup", keyup);
@@ -70,6 +69,7 @@ export const newKeyBoard = (game) => {
     if (e.code === "ControlLeft" || e.code === "ControlRight")
       keyboard.ctrl = false;
   };
+  document.addEventListener("keydown", keydown);
   document.addEventListener("keyup", keyup);
 
   return keyboard;

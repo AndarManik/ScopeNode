@@ -241,15 +241,15 @@ export const createPlayerRenderer = (
   ) => {
     const [ox, oy] = center;
 
-    if (objectiveRadius - playerRadius <= 0.1) {
+    if (objectiveRadius <= 2 * playerRadius) {
       // Solid disc in the middle
       targetCtx.fillStyle = styleColor;
       targetCtx.beginPath();
-      targetCtx.arc(ox, oy, playerRadius, 0, Math.PI * 2);
+      targetCtx.arc(ox, oy, objectiveRadius, 0, Math.PI * 2);
       targetCtx.fill();
     } else {
       // Expanding ring
-      targetCtx.lineWidth = playerRadius * 2 * timeBeta;
+      targetCtx.lineWidth = playerRadius * (1 + timeBeta);
       targetCtx.strokeStyle = styleColor;
       targetCtx.beginPath();
       targetCtx.arc(
@@ -275,7 +275,6 @@ export const createPlayerRenderer = (
     color,
     glow = null
   ) => {
-    if (timeAlpha > 1) return;
     const timeBeta = 1 - timeAlpha;
     const rawObjectiveRadius =
       timeBeta * playerRadius + timeAlpha * maxObjectiveRadius;
