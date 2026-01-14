@@ -2,15 +2,12 @@ import { jiggleApp } from "../screentransform.js";
 
 export const settings = (app) => {
   const { menu, socket } = app;
-  const settingsObj = app.settings; // from addUserSettings
+  const settingsObj = app.settings;
   jiggleApp();
   menu.reset();
   const previousScene = menu.scene;
   menu.scene = settings;
 
-  // ---------------------------------------------------------------------------
-  // Top navigation (fixed, non-scrolling)
-  // ---------------------------------------------------------------------------
   const title = menu.newEl(6, 1, 6, 1);
   title.innerText = "Scope Node: Protocol";
 
@@ -22,18 +19,12 @@ export const settings = (app) => {
   escape.innerText = `Esc`;
   escape.addEventListener("click", menu.toggle);
 
-  // ---------------------------------------------------------------------------
-  // Scroll primitive
-  // ---------------------------------------------------------------------------
-
   // first scrollable grid row (rows 1–2 are header + jump row, row 3 as spacer)
   const CONTENT_Y_START = 4;
 
   const scrollElements = new Set(); // currently rendered scrollable elements
   const rowDefs = [];
-  const sectionIndices = {
-    top: 0,
-  };
+  const sectionIndices = { top: 0 };
 
   const clearScrollElements = () => {
     for (const el of scrollElements) menu.deleteEl(el);
@@ -48,7 +39,7 @@ export const settings = (app) => {
   };
 
   // convenience: standard label + number input row
-  const numberRowDef = (label, getValue, setValue) => ({
+  const numberRowDef = (label, settings, name) => ({
     height: 1,
     create: (yBase) => {
       const elements = [];
@@ -59,14 +50,14 @@ export const settings = (app) => {
 
       const inputEl = menu.newEl(7, yBase, 9, 1, "input");
       inputEl.type = "number";
-      inputEl.value = String(getValue());
+      inputEl.value = settings[name];
       inputEl.style.backgroundColor = "var(--input)";
       elements.push(inputEl);
 
       inputEl.addEventListener("input", () => {
         const v = Number(inputEl.value);
         if (!Number.isFinite(v)) return;
-        setValue(v);
+        settings[name] = v;
       });
 
       return elements;
@@ -120,7 +111,6 @@ export const settings = (app) => {
           height: 1,
           create: (yBase) => {
             const elements = [];
-
             const samples = [
               "--lightLeft",
               "--light",
@@ -132,17 +122,14 @@ export const settings = (app) => {
               "--inputOff",
               "--inputRightOff",
             ];
-
             const startX = 7;
             const endX = 15;
             let x = startX;
             let y = yBase;
-
             for (const cssVar of samples) {
               const el = menu.newEl(x, y, 1, 1, "div");
               el.style.backgroundColor = `var(${cssVar})`;
               elements.push(el);
-
               x += 1;
               if (x > endX) {
                 x = startX;
@@ -161,14 +148,7 @@ export const settings = (app) => {
       jumpLabel: "Render",
       headerLabel: "Render Settings",
       rows: [
-        // Scale
-        numberRowDef(
-          "Scale",
-          () => settingsObj.render.scale,
-          (v) => {
-            settingsObj.render.scale = v;
-          }
-        ),
+        numberRowDef("Scale", settingsObj.render, "scale"),
         // Glow Enabled
         {
           height: 1,
@@ -242,22 +222,8 @@ export const settings = (app) => {
             return elements;
           },
         },
-        // Bullet Speed
-        numberRowDef(
-          "Bullet Speed",
-          () => settingsObj.render.bulletSpeed,
-          (v) => {
-            settingsObj.render.bulletSpeed = v;
-          }
-        ),
-        // Shell Angle
-        numberRowDef(
-          "Shell Angle",
-          () => settingsObj.render.shellAngle,
-          (v) => {
-            settingsObj.render.shellAngle = v;
-          }
-        ),
+        numberRowDef("Bullet Speed", settingsObj.render, "bulletSpeed"),
+        numberRowDef("Shell Angle", settingsObj.render, "shellAngle"),
       ],
     },
     {
@@ -265,34 +231,10 @@ export const settings = (app) => {
       jumpLabel: "Solo",
       headerLabel: "Solo Settings",
       rows: [
-        numberRowDef(
-          "Player Radius",
-          () => settingsObj.game.playerRadius,
-          (v) => {
-            settingsObj.game.playerRadius = v;
-          }
-        ),
-        numberRowDef(
-          "Move Speed",
-          () => settingsObj.game.moveSpeed,
-          (v) => {
-            settingsObj.game.moveSpeed = v;
-          }
-        ),
-        numberRowDef(
-          "Obstacle Area",
-          () => settingsObj.game.obstacleArea,
-          (v) => {
-            settingsObj.game.obstacleArea = v;
-          }
-        ),
-        numberRowDef(
-          "Obstacle Start Count",
-          () => settingsObj.game.obstacleStartCount,
-          (v) => {
-            settingsObj.game.obstacleStartCount = v;
-          }
-        ),
+        numberRowDef("Player Radius", settingsObj.game, "playerRadius"),
+        numberRowDef("Move Speed", settingsObj.game, "moveSpeed"),
+        numberRowDef("Obstacle Area", settingsObj.game, "obstacleArea"),
+        numberRowDef("Obstacle Start Count", settingsObj.game, "obstacleStartCount"),
       ],
     },
   ];

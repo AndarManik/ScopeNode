@@ -2,40 +2,46 @@ import { newObstaclePreview } from "./arena.js";
 import { registerTarget } from "./hitreg.js";
 import { moveAlongPath, planPath } from "./pathing.js";
 
-export const update = (game, app, delta, team1, team2) => {
+export const update = (game, app, delta, team1) => {
   if (game.previewingObstacle) return;
-
   if (game.choosingObstacle) return newObstaclePreview(game, app.socket);
-
-  game.path = [];
-  if (!game.playerIsDead) updatePlayerPosition(game, delta);
-  updateGlobalPositions(game, delta);
 
   game.team1Lights = new Map();
   game.team2Lights = new Map();
+  game.path = [];
+
+  if (!game.playerIsDead) updatePlayerPosition(game, delta);
+  updateGlobalPositions(game, delta);
+
+
   if (game.lightGraph) {
     if (!game.playerIsDead) updatePlayerLight(game, team1);
     updateGlobalLights(game, team1);
 
-    if (!game.playerIsDead) updatePlayerAim(game, team1, delta);
-    updateGlboalAim(game, team1, delta);
+    if (!game.playerIsDead) updatePlayerAim(game, delta);
+    updateGlobalAim(game, team1, delta);
   }
 
-  game.virtualServer.shots.forEach(
-    (shot) => shot.finished && (shot.anim = (shot.anim ?? -delta) + delta)
-  );
+  updateShots(game, delta);
 };
 
 const updatePlayerPosition = (game, delta) => {
-  let step = game.moveSpeed * game.playerRadius * delta;
-  if (game.keyboard.shift) step /= 1.5;
-  if (game.keyboard.ctrl) step /= 2;
+  const shiftSlow = game.keyboard.shift ? 2 / 3 : 1;
+  const ctrlSlow = game.keyboard.crtl ? 1 / 2 : 1;
+  const moveSpeed = shiftSlow * ctrlSlow * game.moveSpeed
+  const step = moveSpeed * game.playerRadius * delta;
   const target = getPlayerPathTarget(game);
   game.path = planPath(game, game.playerPosition, target);
   if (!game.preRound) moveAlongPath(game.playerPosition, game.path, step);
 };
 
 const getPlayerPathTarget = (game) => {
+  if (game.keyboard.space) return game.playerPosition;
+  if (game.inputPreference === "mouse") return getMouseTarget(game)
+  else return getWASDTarget(game);
+};
+
+const getMouseTarget = (game) => {
   if (!game.mouse.isClicking) return game.mouse;
   const [px, py] = game.playerPosition;
   const [mx, my] = game.mouse;
@@ -43,21 +49,27 @@ const getPlayerPathTarget = (game) => {
   const dy = my - py;
   const d = Math.hypot(dx, dy);
   if (d === 0) return [px, py];
-  const maxDist = 1 * playerRadius;
-  const dist = Math.min(maxDist, d);
+  const dist = Math.min(game.playerRadius, d);
   return [px + (dx / d) * dist, py + (dy / d) * dist];
 };
+
+const getWASDTarget = (game) => {
+  const { w, a, s, d } = game.keyboard;
+  const [px, py] = game.playerPosition
+  const { playerRadius } = game;
+  const x = d - a;
+  const y = w - s;
+  return [px + x * playerRadius, py + y * playerRadius];
+}
 
 const updateGlobalPositions = (game, delta) => {
   const { moveSpeed, playerRadius } = game;
   for (const state of game.virtualServer.globalStates.values()) {
-    if (!state.seen) {
-      state.interp = false;
-      state.seen = true;
-      continue;
-    }
-    state.interp = true;
-    let step = moveSpeed * playerRadius * delta;
+    // vServer sets seen to false when state is new
+    state.interp = state.seen;
+    state.seen = true;
+    if (!state.interp) return;
+    const step = moveSpeed * playerRadius * delta;
     moveAlongPath(state.position, state.path, step);
   }
 };
@@ -65,9 +77,8 @@ const updateGlobalPositions = (game, delta) => {
 const updatePlayerLight = (game, team1) => {
   game.playerLight = game.lightGraph.shineAt(game.playerPosition);
   game.playerLight.push(game.playerPosition);
-  if (team1.has(game.userId))
-    game.team1Lights.set(game.userId, game.playerLight);
-  else game.team2Lights.set(game.userId, game.playerLight);
+  const teamLight = game.isTeam1 ? game.team1Lights : game.team2Lights;
+  teamLight.set(game.userId, game.playerLight)
 };
 
 const updateGlobalLights = (game, team1) => {
@@ -75,48 +86,27 @@ const updateGlobalLights = (game, team1) => {
     const light = state.interp
       ? game.lightGraph.shineAt(state.position)
       : state.light;
-
     light.push(state.position);
     if (team1.has(uuid)) game.team1Lights.set(uuid, light);
     else game.team2Lights.set(uuid, light);
   }
 };
 
-const updatePlayerAim = (game, team1, delta) => {
+const updatePlayerAim = (game, delta) => {
+  const { playerPosition } = game;
   const team1Target = [...game.team1Lights.values()];
   const team2Target = [...game.team2Lights.values()];
-
-  const isTeam1 = team1.has(game.userId);
-  const shooter = isTeam1
-    ? game.team1Lights.get(game.userId)
-    : game.team2Lights.get(game.userId);
-  const enemies = isTeam1 ? team2Target : team1Target;
-
+  const teamLight = game.isTeam1 ? game.team1Lights : game.team2Lights
+  const shooter = teamLight.get(game.userId);
+  const enemies = game.isTeam1 ? team2Target : team1Target;
   const rawTarget = registerTarget(shooter, enemies, game.playerRadius);
-
-  if (!rawTarget) {
-    const fallBackTarget = game.path[1] || game.mouse;
-    const smoothedPos = smoothTargetPos(
-      game,
-      game.playerPosition,
-      fallBackTarget,
-      delta
-    );
-    game.playerTarget = [smoothedPos, false];
-  } else {
-    const [desiredPos, hasAdvantage] = rawTarget;
-    const fallBackTarget = desiredPos || game.path[1] || game.mouse;
-    const smoothedPos = smoothTargetPos(
-      game,
-      game.playerPosition,
-      fallBackTarget,
-      delta
-    );
-    game.playerTarget = [smoothedPos, hasAdvantage];
-  }
+  const [desiredPos, hasAdvantage] = rawTarget || [false, false];
+  const fallback = desiredPos || game.path[1] || game.mouse;
+  const target = smoothTargetPos(game, playerPosition, fallback, delta);
+  game.playerTarget = [target, hasAdvantage];
 };
 
-const updateGlboalAim = (game, team1, delta) => {
+const updateGlobalAim = (game, team1, delta) => {
   const team1Target = [...game.team1Lights.values()];
   const team2Target = [...game.team2Lights.values()];
   for (const [uuid, state] of game.virtualServer.globalStates) {
@@ -125,27 +115,10 @@ const updateGlboalAim = (game, team1, delta) => {
     const enemies = isTeam1 ? team2Target : team1Target;
 
     const rawTarget = registerTarget(shooter, enemies, game.playerRadius);
-
-    if (!rawTarget) {
-      const fallBackTarget = state.path[1] || state.position;
-      const smoothedPos = smoothTargetPos(
-        state,
-        state.position,
-        fallBackTarget,
-        delta
-      );
-      state.target = [smoothedPos, false];
-    } else {
-      const [desiredPos, hasAdvantage] = rawTarget;
-      const fallBackTarget = desiredPos || state.path[1] || state.position;
-      const smoothedPos = smoothTargetPos(
-        state,
-        state.position,
-        fallBackTarget,
-        delta
-      );
-      state.target = [smoothedPos, hasAdvantage];
-    }
+    const [desiredPos, hasAdvantage] = rawTarget || [false, false];
+    const fallback = desiredPos || state.path[1] || state.position;
+    const target = smoothTargetPos(state, state.position, fallback, delta);
+    state.target = [target, hasAdvantage];
   }
 };
 
@@ -192,4 +165,12 @@ export function smoothTargetPos(state, pos, desiredPos, delta) {
   state._smoothedTargetAngularVel = vel;
 
   return wrapped;
+}
+
+const updateShots = (game, delta) => {
+  game.virtualServer.shots.forEach((shot) => {
+    if (shot.finished) return;
+    if (shot.anim == null) shot.anim = 0
+    else shot.anim += delta;
+  });
 }
