@@ -35,7 +35,7 @@ export const newLobbyServer = (webSocketServer) => {
     socket.disconnectTimeout = setTimeout(() => {
       lobbyServer.leaveLobby(socket);
       sockets.delete(socket.id);
-    }, 15000);
+    }, 5000);
   };
 
   lobbyServer.awakeSocket = (socket, id) => {

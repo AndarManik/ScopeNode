@@ -290,6 +290,16 @@ export const newVirtualServer = (game, app, team1, team2) => {
     globalDead.add(shot.killed);
   };
 
+  virtualServer.updatePlayers = (team1, team2) => {
+    for (const player in globalStates) {
+      if (team1.has(player)) continue;
+      if (team2.has(player)) continue;
+      globalStates.delete(player);
+      globalHistories.delete(player);
+      globalDead.add(player);
+    }
+  }
+
   virtualServer.start = () => {
     virtualServer.startTime = performance.now();
     lastHeadroomTime = virtualServer.startTime;
