@@ -72,7 +72,6 @@ export const newLobbyServer = (webSocketServer) => {
     socket.lobby = newLobby(lobbyCode);
     lobbies.set(lobbyCode, socket.lobby);
     socket.lobby.addConnection(socket);
-
     socket.json({ command: "join lobby", lobbyCode });
   };
 
@@ -82,9 +81,7 @@ export const newLobbyServer = (webSocketServer) => {
     if (!lobbies.has(lobbyCode)) return socket.json({ command: "no lobby" });
 
     socket.lobby = lobbies.get(lobbyCode);
-    lobbies.set(lobbyCode, socket.lobby);
     socket.lobby.addConnection(socket);
-
     socket.json({ command: "join lobby", lobbyCode });
   };
 

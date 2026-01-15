@@ -60,11 +60,6 @@ export const newGame = (app, options, team1, team2) => {
     } catch (err) {
       console.error("ENGINE RENDER ERROR:", err);
     }
-    try {
-      game.virtualServer.nextTick();
-    } catch (err) {
-      console.error("ENGINE VSERVER ERROR:", err);
-    }
     app.stats.log.set("FPS", Math.round(1 / delta));
     requestAnimationFrame(engineCycle);
   };
@@ -203,8 +198,8 @@ export const newGame = (app, options, team1, team2) => {
     };
 
     game.updatePlayers = (newTeam1, newTeam2) => {
-      newTeam1 = new Set(newTeam1.map(({userId}) => userId));
-      newTeam2 = new Set(newTeam2.map(({userId}) => userId));
+      newTeam1 = new Set(newTeam1.map(({ userId }) => userId));
+      newTeam2 = new Set(newTeam2.map(({ userId }) => userId));
       team1 = newTeam1;
       team2 = newTeam2;
       game.virtualServer.updatePlayers(newTeam1, newTeam2);
