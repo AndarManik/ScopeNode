@@ -3,7 +3,7 @@ import { registerHit } from "./hitreg.js";
 
 export const newVirtualServer = (game, app, team1, team2) => {
   const { socket, stats } = app;
-  let HZ = 32;
+  const HZ = 32;
 
   const all = [...team1, ...team2];
   all.sort();
@@ -11,7 +11,6 @@ export const newVirtualServer = (game, app, team1, team2) => {
   all.forEach((uuid, index) => (allInv[uuid] = index));
 
   const localHistory = [];
-
   const globalDead = new Set();
   const globalStates = new Map();
   const globalHistories = new Map();
@@ -291,14 +290,16 @@ export const newVirtualServer = (game, app, team1, team2) => {
   };
 
   virtualServer.updatePlayers = (team1, team2) => {
-    for (const player in globalStates) {
+    const currentPlayers = Array.from(globalStates.keys());
+    for (const player of currentPlayers) {
       if (team1.has(player)) continue;
       if (team2.has(player)) continue;
       globalStates.delete(player);
       globalHistories.delete(player);
       globalDead.add(player);
     }
-  }
+  };
+
 
   virtualServer.start = () => {
     virtualServer.startTime = performance.now();

@@ -121,7 +121,7 @@ const handleMessage = (app, message) => {
       menu.team2 = data.team2;
       menu.spec = data.spec;
       updateLobbyNames(menu);
-      app.game.updatePlayers(data.team1, (data.team2));
+      app.game.updatePlayers(data.team1, data.team2);
       return;
     }
 

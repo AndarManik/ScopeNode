@@ -77,11 +77,8 @@ const newMessageHandler = (lobbyServer, socket) => (msg, isBinary) => {
   );
 
   switch (message.command) {
-    // persistent connection
     case "reconnect":
       return lobbyServer.awakeSocket(socket, message.id);
-
-    // lobby selector
 
     case "create lobby":
       return lobbyServer.createLobby(socket);
@@ -91,8 +88,6 @@ const newMessageHandler = (lobbyServer, socket) => (msg, isBinary) => {
 
     case "leave lobby":
       return lobbyServer.leaveLobby(socket);
-
-    // pre lobby
 
     case "set map size":
       return socket.lobby?.setSize(message.size);

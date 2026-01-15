@@ -202,11 +202,12 @@ export const newGame = (app, options, team1, team2) => {
       } else game.virtualServer.addState(data);
     };
 
-    game.updatePlayers = (team1, team2) => {
-      // make team1 and team2 a hot variable.
-      team1 = new Set(team1.map(({userId}) => userId));
-      team2 = new Set(team2.map(({userId}) => userId));
-      game.virtualServer.updatePlayers(team1, team2);
+    game.updatePlayers = (newTeam1, newTeam2) => {
+      newTeam1 = new Set(newTeam1.map(({userId}) => userId));
+      newTeam2 = new Set(newTeam2.map(({userId}) => userId));
+      team1 = newTeam1;
+      team2 = newTeam2;
+      game.virtualServer.updatePlayers(newTeam1, newTeam2);
     }
 
     app.socket.json({ command: "client ready" });
@@ -239,7 +240,7 @@ const parseGameOptions = (app, game, options) => {
       game.obstacleStartCount = 12;
       break;
     case "large":
-      game.playerRadius = 10;
+      game.playerRadius = 12;
       game.moveSpeed = 6.25;
       game.obstacleArea = 5.5;
       game.obstacleStartCount = 16;
