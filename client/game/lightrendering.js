@@ -47,19 +47,6 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     cctx.clearRect(0, 0, pixelWidth, pixelHeight);
   };
 
-  // Draw in map coordinates; scaling is handled via transforms
-  const drawPolygon = (cctx, poly) => {
-    if (!poly || poly.length < 3) return;
-    cctx.beginPath();
-    cctx.moveTo(poly[0][0], poly[0][1]);
-    for (let i = 1; i < poly.length; i++) {
-      cctx.lineTo(poly[i][0], poly[i][1]);
-    }
-    cctx.closePath();
-    cctx.fill();
-  };
-
-  // Variant that fills AND strokes (used for Minkowski-ish expansion)
   const drawPolygonFillAndStroke = (cctx, poly) => {
     if (!poly || poly.length < 3) return;
     cctx.beginPath();
@@ -92,8 +79,12 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     // ========= T1 = union of point polys (center visibility) =========
     withMapTransform(point.ctx, () => {
       point.ctx.fillStyle = "white";
+      point.ctx.strokeStyle = "white";
+      point.ctx.lineJoin = "round";
+      point.ctx.lineCap = "round";
+      point.ctx.lineWidth = 2;
       for (const [pointPoly] of team) {
-        drawPolygon(point.ctx, pointPoly);
+        drawPolygonFillAndStroke(point.ctx, pointPoly);
       }
     });
 
@@ -119,10 +110,14 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     // ========= union of disk polys =========
     withMapTransform(disk.ctx, () => {
       disk.ctx.fillStyle = "white";
+      disk.ctx.strokeStyle = "white";
+      disk.ctx.lineJoin = "round";
+      disk.ctx.lineCap = "round";
+      disk.ctx.lineWidth = 2;
       for (const [, diskPolys] of team) {
         if (!diskPolys) continue;
         for (const poly of diskPolys) {
-          drawPolygon(disk.ctx, poly);
+          drawPolygonFillAndStroke(disk.ctx, poly);
         }
       }
     });
@@ -198,9 +193,13 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     // NOTE: uses ORIGINAL obstacle polygons, NOT expanded
     if (excludedPolygons && excludedPolygons.length > 0) {
       bctx.fillStyle = "white";
+      bctx.strokeStyle = "white";
+      bctx.lineJoin = "round";
+      bctx.lineCap = "round";
+      bctx.lineWidth = 2;
       withMapTransform(bctx, () => {
         for (const { poly } of excludedPolygons) {
-          drawPolygon(bctx, poly);
+          drawPolygonFillAndStroke(bctx, poly);
         }
       });
     }
@@ -362,16 +361,8 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     // 3) Draw SOFT T2b (original disk \ T1), un-clipped but under HARD T2b
     //    These give you "soft-disk" areas where center LOS exists,
     //    even if a full-radius body can't get a kill.
-    paintMask(
-      t1Masks.t2bSoftMask,
-      color.team1Disk,
-      maybeGlow(color.team1Disk)
-    );
-    paintMask(
-      t2Masks.t2bSoftMask,
-      color.team2Disk,
-      maybeGlow(color.team2Disk)
-    );
+    paintMask(t1Masks.t2bSoftMask, color.team1Disk, maybeGlow(color.team1Disk));
+    paintMask(t2Masks.t2bSoftMask, color.team2Disk, maybeGlow(color.team2Disk));
 
     // 4) Draw HARD T2b (now WITHOUT intersection and obstacle-expanded)
     paintMask(t1Masks.t2bMask, color.team2Disk, maybeGlow(color.team2Disk));
