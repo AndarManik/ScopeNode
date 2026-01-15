@@ -29,13 +29,20 @@ uniform int u_count;              // number of warp points
 uniform vec2 u_points[${maxPoints}];
 uniform float u_ampPx;
 uniform float u_sigmaPx;
+uniform bool u_xSwap;             // <--- NEW
 
 varying vec2 v_uv;
 
 void main() {
+  // Flip Y because canvas vs WebGL coords
   vec2 uv = vec2(v_uv.x, 1.0 - v_uv.y);
-  vec2 pPx = uv * u_resolution;
 
+  // If xSwap: mirror horizontally (right <-> left)
+  if (u_xSwap) {
+    uv.x = 1.0 - uv.x;
+  }
+
+  vec2 pPx = uv * u_resolution;
 
   vec2 disp = vec2(0.0);
   float sigma2 = u_sigmaPx * u_sigmaPx;
@@ -92,7 +99,14 @@ void main() {
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
   gl.bufferData(
     gl.ARRAY_BUFFER,
-    new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+    new Float32Array([
+      -1, -1,
+       1, -1,
+      -1,  1,
+      -1,  1,
+       1, -1,
+       1,  1
+    ]),
     gl.STATIC_DRAW
   );
 
@@ -103,6 +117,7 @@ void main() {
   const u_points0 = gl.getUniformLocation(prog, "u_points[0]");
   const u_ampPx = gl.getUniformLocation(prog, "u_ampPx");
   const u_sigmaPx = gl.getUniformLocation(prog, "u_sigmaPx");
+  const u_xSwap = gl.getUniformLocation(prog, "u_xSwap"); // <--- NEW
 
   const sceneTex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, sceneTex);
@@ -123,7 +138,7 @@ void main() {
     gl.viewport(0, 0, w, h);
   }
 
-  function render({ pointsPx, ampPx = 12, sigmaPx = 140 }) {
+  function render({ pointsPx, ampPx = 12, sigmaPx = 140, xSwap = false }) {
     resizeToMatchSource();
 
     gl.bindTexture(gl.TEXTURE_2D, sceneTex);
@@ -161,6 +176,7 @@ void main() {
     gl.uniform2fv(u_points0, pointsFlat);
     gl.uniform1f(u_ampPx, ampPx);
     gl.uniform1f(u_sigmaPx, sigmaPx);
+    gl.uniform1i(u_xSwap, xSwap ? 1 : 0); // <--- NEW
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }

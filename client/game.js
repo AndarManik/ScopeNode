@@ -44,8 +44,11 @@ export const newGame = (app, options, team1, team2) => {
     game.playerLight = [[], []];
   };
 
+  let isFocused = true;
   let last = performance.now();
-  const engineCycle = () => {
+  let timeoutId = null;
+  let rafId = null;
+  const tick = (next) => {
     if (game.isDead) return;
     const now = performance.now();
     const delta = (now - last) / 1000;
@@ -61,11 +64,34 @@ export const newGame = (app, options, team1, team2) => {
       console.error("ENGINE RENDER ERROR:", err);
     }
     app.stats.log.set("FPS", Math.round(1 / delta));
-    requestAnimationFrame(engineCycle);
+    next();
   };
 
+  const runRAF = () =>
+    isFocused && (rafId = requestAnimationFrame(() => tick(runRAF)));
+  const runTimeout = () =>
+    !isFocused && (timeoutId = setTimeout(() => tick(runTimeout), 1000 / 60));
+
+  window.addEventListener("focus", () => {
+    if (isFocused) return;
+    isFocused = true;
+    clearTimeout(timeoutId);
+    timeoutId = null;
+    last = performance.now();
+    runRAF();
+  });
+
+  window.addEventListener("blur", () => {
+    if (!isFocused) return;
+    isFocused = false;
+    cancelAnimationFrame(rafId);
+    rafId = null;
+    last = performance.now();
+    runTimeout();
+  });
+
   init();
-  engineCycle();
+  tick(runRAF);
 
   if (game.isMultiPlayer) {
     game.handleBuildObstacles = () => {

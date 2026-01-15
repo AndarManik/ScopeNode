@@ -3,6 +3,12 @@ import { registerTarget } from "./hitreg.js";
 import { moveAlongPath, planPath } from "./pathing.js";
 
 export const update = (game, app, delta, team1) => {
+  game.xSwap = false;
+  if (game.renderSettings.preferredSide === "left" && !game.isTeam1)
+    game.xSwap = true;
+  if (game.renderSettings.preferredSide === "right" && game.isTeam1)
+    game.xSwap = true;
+
   if (game.previewingObstacle) return;
   if (game.choosingObstacle) return newObstaclePreview(game, app.socket);
 
@@ -41,9 +47,11 @@ const getPlayerPathTarget = (game) => {
 };
 
 const getMouseTarget = (game) => {
-  if (!game.mouse.isClicking) return game.mouse;
-  const [px, py] = game.playerPosition;
   const [mx, my] = game.mouse;
+  if (!game.mouse.isClicking) return game.mouse;
+
+  const [px, py] = game.playerPosition;
+
   const dx = mx - px;
   const dy = my - py;
   const d = Math.hypot(dx, dy);
@@ -57,7 +65,7 @@ const getWASDTarget = (game) => {
   const [px, py] = game.playerPosition;
   const { playerRadius } = game;
 
-  let x = d - a;
+  let x = (d - a) * (game.xSwap ? -1 : 1);
   let y = w - s;
 
   if (x === 0 && y === 0) return [px, py];

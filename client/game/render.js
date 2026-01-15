@@ -179,6 +179,7 @@ export const render = (game, team1, team2) => {
 
     game.warpFX.render({
       pointsPx: [],
+      xSwap: game.xSwap,
     });
     return;
   }
@@ -366,6 +367,7 @@ export const render = (game, team1, team2) => {
     pointsPx: bullets,
     ampPx: 0.25 * playerRadius * s, // tune: pixels
     sigmaPx: 100 * playerRadius * s, // tune: pixels
+    xSwap: game.xSwap,
   });
 };
 

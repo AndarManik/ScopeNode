@@ -12,6 +12,7 @@ export const newMouse = (game, menu) => {
     mouse[0] = e.clientX - rect.left;
     if (mouse[0] < playerRadius) mouse[0] = playerRadius;
     if (mouse[0] > maxX) mouse[0] = maxX;
+    if (game.xSwap) mouse[0] = game.mapWidth - mouse[0];
     mouse[1] = rect.bottom - e.clientY;
     if (mouse[1] < playerRadius) mouse[1] = playerRadius;
     if (mouse[1] > maxY) mouse[1] = maxY;
