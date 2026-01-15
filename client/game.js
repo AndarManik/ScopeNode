@@ -33,8 +33,8 @@ export const newGame = (app, options, team1, team2) => {
   game.previewAlpha = 0;
   game.previewAngle = 0;
 
-  game.mouse = newMouse(game);
-  game.keyboard = newKeyBoard(game);
+  game.mouse = newMouse(game, app.menu);
+  game.keyboard = newKeyBoard(game, app.menu);
   game.virtualServer = newVirtualServer(game, app, team1, team2);
 
   const init = () => {
@@ -117,8 +117,8 @@ export const newGame = (app, options, team1, team2) => {
           winner === "draw"
             ? "ROUND DRAW"
             : winner === teamString
-              ? "ROUND WON"
-              : "ROUND LOST";
+            ? "ROUND WON"
+            : "ROUND LOST";
         hugeText.innerText = `${score.join(" - ")}\n${resultText}`;
 
         setTimeout(fadeOutRoundText, 3000);
@@ -141,8 +141,7 @@ export const newGame = (app, options, team1, team2) => {
       game.choosingObstacle = true;
       const total = 20000;
       const countdowns = [10, 5, 3, 2, 1];
-      countdowns.forEach((secLeft) => {
-        const ms = total - secLeft * 1000;
+      game.forceDrop = countdowns.map((secLeft) =>
         setTimeout(() => {
           // Show the number
           if (!game.choosingObstacle) return;
@@ -154,12 +153,12 @@ export const newGame = (app, options, team1, team2) => {
             hugeText.classList.add("fading-out");
             hugeText.style.opacity = 0;
           }, 250);
-        }, ms);
-      });
+        }, total - secLeft * 1000)
+      );
 
-      game.forceDrop = setTimeout(() => {
-        forceDropNewObstacle(game, app.socket);
-      }, total);
+      game.forceDrop.push(
+        setTimeout(() => forceDropNewObstacle(game, app.socket), total)
+      );
     };
 
     game.confirmPreviewObstacle = (obstacle) => {
@@ -178,8 +177,8 @@ export const newGame = (app, options, team1, team2) => {
           winner === "draw"
             ? "MATCH DRAW"
             : winner === teamString
-              ? "MATCH WON"
-              : "MATCH LOST";
+            ? "MATCH WON"
+            : "MATCH LOST";
         hugeText.innerText = `${score.join(" - ")}\n${resultText}`;
       };
       const fadeOutRoundText = () => {
@@ -203,14 +202,14 @@ export const newGame = (app, options, team1, team2) => {
       team1 = newTeam1;
       team2 = newTeam2;
       game.virtualServer.updatePlayers(newTeam1, newTeam2);
-    }
+    };
 
     app.socket.json({ command: "client ready" });
   } else {
     initializeObstacles(game);
     game.virtualServer.start();
-    game.handleMessage = () => { };
-    game.updatePlayers = () => { };
+    game.handleMessage = () => {};
+    game.updatePlayers = () => {};
   }
 
   return game;

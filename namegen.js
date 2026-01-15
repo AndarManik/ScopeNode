@@ -87,17 +87,3 @@ export const newLobbyCode = () => samp(comps) + "-" + samp(alpha) + samp(num);
 
 export const newUsername = () =>
   `${samp(num)}-${samp(comps)}-${samp(comps)}-${samp(alpha) + samp(num)}`;
-
-export const couldBeLobbyCode = (str) => {
-  if (str.length < 4) return false;
-  const dashIndex = str.lastIndexOf("-");
-  if (dashIndex === -1) return false;
-  const comp = str.slice(0, dashIndex);
-  const tail = str.slice(dashIndex + 1);
-  if (!comps.includes(comp)) return false;
-  if (tail.length !== 2) return false;
-  const [letter, digit] = tail;
-  if (!alpha.includes(letter)) return false;
-  if (!num.includes(digit)) return false;
-  return true;
-};

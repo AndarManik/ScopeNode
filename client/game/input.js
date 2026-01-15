@@ -1,4 +1,4 @@
-export const newMouse = (game) => {
+export const newMouse = (game, menu) => {
   const { playerRadius, mapWidth, mapHeight } = game;
   const canvas = document.getElementById("Game");
   const mouse = [0, 0];
@@ -6,6 +6,7 @@ export const newMouse = (game) => {
   const maxY = mapHeight - playerRadius;
 
   const handleMove = (e) => {
+    if (menu.open) return;
     if (game.isDead) document.removeEventListener("mousemove", handleMove);
     const rect = canvas.getBoundingClientRect();
     mouse[0] = e.clientX - rect.left;
@@ -21,18 +22,21 @@ export const newMouse = (game) => {
   };
 
   const handleMouseDown = (e) => {
+    if (menu.open) return;
     if (game.isDead) document.removeEventListener("mousedown", handleMouseDown);
     if (e.button !== 0) return;
     mouse.isClicking = true;
   };
 
   const handleMouseUp = (e) => {
+    if (menu.open) return;
     if (game.isDead) document.removeEventListener("mouseup", handleMouseUp);
     if (e.button !== 0) return;
     mouse.isClicking = false;
   };
 
   const handleWheel = (e) => {
+    if (menu.open) return;
     if (game.isDead) document.removeEventListener("wheel", handleWheel);
 
     if (!game.choosingObstacle) return;
@@ -64,7 +68,7 @@ const MOVEMENT_KEYS = new Set([
   "ControlRight",
 ]);
 
-export const newKeyBoard = (game) => {
+export const newKeyBoard = (game, menu) => {
   const keyboard = {
     shift: false,
     ctrl: false,
@@ -76,7 +80,12 @@ export const newKeyBoard = (game) => {
   };
 
   const handleKey = (e, isDown) => {
-    if (game.isDead) return;
+    if (menu.open) return;
+    if (game.isDead) {
+      document.removeEventListener("keydown", keydown, { passive: false });
+      document.removeEventListener("keyup", keyup, { passive: false });
+      return;
+    }
 
     // ----- Block propagation for movement keys -----
     if (MOVEMENT_KEYS.has(e.code)) {

@@ -1,6 +1,5 @@
 import { jiggleApp } from "../screentransform.js";
 import { main } from "./main.js";
-import { couldBeLobbyCode } from "./namegen.js";
 
 export const join = (app) => {
   const { menu, socket } = app;

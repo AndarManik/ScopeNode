@@ -10,7 +10,7 @@ const app = {};
 addUserSettings(app);
 app.stats = newStats(app);
 app.color = newColor(app);
-app.game = newGame(app);
 app.socket = newSocket(app);
 app.menu = newMenu(app);
+app.game = newGame(app);
 main(app);

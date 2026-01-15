@@ -47,6 +47,7 @@ export const newObstaclePreview = (game, socket) => {
 
   if (game.mouse.isClicking && game.previewObstacle.index !== -1) {
     game.choosingObstacle = false;
+    game.forceDrop.forEach(clearTimeout);
     addObstacle(game, game.previewObstacle);
     return socket.json({
       command: "confirm obstacle",
@@ -69,6 +70,7 @@ export const newObstaclePreview = (game, socket) => {
 export const forceDropNewObstacle = (game, socket) => {
   if (!game.choosingObstacle) return;
   game.choosingObstacle = false;
+  game.forceDrop.forEach(clearTimeout);
 
   if (game.previewObstacle.index !== -1) {
     addObstacle(game, game.previewObstacle);
