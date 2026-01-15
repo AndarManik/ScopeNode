@@ -22,31 +22,31 @@ export const newColor = (app) => {
 
   color.setGameByHue = () => {
     const hue = color.hue;
-    color.background = `oklch(0.09 0.015 ${hue + 60})`;
+    color.background = `oklch(0.09 0.015 ${hue})`;
 
-    color.team1Player = `oklch(0.82 0.088 ${hue + 45})`;
-    color.team2Player = `oklch(0.82 0.088 ${hue - 45})`;
+    color.team1Player = `oklch(0.82 0.088 ${hue + 60})`;
+    color.team2Player = `oklch(0.82 0.088 ${hue - 60})`;
     color.centerObjective = `oklch(0.82 0.088 ${hue})`;
 
-    color.team1Path = `oklch(0.90 0.018 ${hue + 45})`;
-    color.team2Path = `oklch(0.90 0.018 ${hue - 45})`;
+    color.team1Path = `oklch(0.90 0.018 ${hue + 60})`;
+    color.team2Path = `oklch(0.90 0.018 ${hue - 60})`;
 
-    color.team1Point = `oklch(0.35 0.025 ${hue + 60})`;
-    color.team2Point = `oklch(0.35 0.025 ${hue - 60})`;
+    color.team1Point = `oklch(0.35 0.025 ${hue + 45})`;
+    color.team2Point = `oklch(0.35 0.025 ${hue - 45})`;
 
-    color.intersectPoint1 = `oklch(0.25 0.030 ${hue - 60})`;
-    color.intersectPoint2 = `oklch(0.25 0.030 ${hue + 60})`;
+    color.intersectPoint1 = `oklch(0.25 0.030 ${hue - 45})`;
+    color.intersectPoint2 = `oklch(0.25 0.030 ${hue + 45})`;
 
-    color.team1Disk = `oklch(0.75 0.125 ${hue + 45})`;
-    color.team2Disk = `oklch(0.75 0.125 ${hue - 45})`;
+    color.team1Disk = `oklch(0.75 0.125 ${hue + 60})`;
+    color.team2Disk = `oklch(0.75 0.125 ${hue - 60})`;
     color.objectiveDisk = `oklch(0.75 0.125 ${hue})`;
     color.intersectDisk = `oklch(0.86 0.065 ${hue})`;
 
-    color.team1Bullet = `oklch(0.90 0.045 ${hue + 45})`;
-    color.team2Bullet = `oklch(0.90 0.045 ${hue - 45})`;
+    color.team1Bullet = `oklch(0.90 0.045 ${hue + 60})`;
+    color.team2Bullet = `oklch(0.90 0.045 ${hue - 60})`;
 
-    color.team1Gun = `oklch(0.60 0.100 ${hue + 60})`;
-    color.team2Gun = `oklch(0.60 0.100 ${hue - 60})`;
+    color.team1Gun = `oklch(0.60 0.100 ${hue + 45})`;
+    color.team2Gun = `oklch(0.60 0.100 ${hue - 45})`;
   };
 
   color.setUIByHue = () => {
@@ -104,7 +104,7 @@ export const newColor = (app) => {
     const { obstacleHueRange, hue } = color;
     const alpha = golden(i);
     const obstacleHue = hue - obstacleHueRange + alpha * obstacleHueRange * 2;
-    return `oklch(0.55 0.090 ${obstacleHue})`;
+    return `oklch(0.55 0.085 ${obstacleHue})`;
   };
 
   color.setUIByHue();

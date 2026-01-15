@@ -37,10 +37,12 @@ export const newLobby = (code) => {
 
     // game ends if team is empty
     if (!team1.size || !team2.size) {
-      const winner = !team1.size && !team2.size ? "draw" : !team2.size ? "team1" : "team2";
+      const winner =
+        !team1.size && !team2.size ? "draw" : !team2.size ? "team1" : "team2";
       const score = lobby.score;
       const endingGame = JSON.stringify({ command: "end game", winner, score });
       connected.forEach((socket) => socket.send(endingGame));
+      state = "lobby";
       return;
     }
 
@@ -57,7 +59,7 @@ export const newLobby = (code) => {
 
       case "starting virtual server":
         return lobby.virtualServerStarted(socket);
-      
+
       case "in round":
         return lobby.checkRoundEnded();
 
@@ -74,7 +76,6 @@ export const newLobby = (code) => {
         return lobby.clientHasConfirmObstacle(socket);
     }
   };
-
 
   lobby.awakeConnection = (oldSocket, socket) => {
     socket.userId = oldSocket.userId;
@@ -180,12 +181,12 @@ export const newLobby = (code) => {
     const builder = [...team1][0];
     builder.isBuilder = true;
     builder.json({ command: "build obstacles" });
-  }
+  };
 
   lobby.distributeObstacles = (socket, obstacles) => {
     if (state !== "building obstacles") return;
     if (socket.clientState !== "client ready") return;
-    state = "distributing obstacles"
+    state = "distributing obstacles";
     socket.clientState = "has obstacles";
     socket.isBuilder = false;
     lobby.obstacles = obstacles;
@@ -206,7 +207,7 @@ export const newLobby = (code) => {
     const startState = "virtual server not started";
     const endState = "virtual server started";
     if (!lobby.stateUpdate(socket, startState, endState)) return;
-    state = "in round"
+    state = "in round";
     const startRound = JSON.stringify({ command: "start round" });
     lobby.stateSend("in round", startRound);
   };
@@ -239,11 +240,11 @@ export const newLobby = (code) => {
     const team2Win = lobby.score[1] === lobby.toWin;
     if (team1Win || team2Win) lobby.endGame(team1Win, team2Win);
     else lobby.endRound(team1Alive, team2Alive);
-  }
+  };
 
   let winner = "draw";
   lobby.endRound = (team1Alive, team2Alive) => {
-    state = "ending round"
+    state = "ending round";
     winner = team1Alive ? "team1" : team2Alive ? "team2" : "draw";
     const score = lobby.score;
     const endingRound = JSON.stringify({ command: "end round", winner, score });
@@ -267,7 +268,7 @@ export const newLobby = (code) => {
     const endState = "virtual server stopped";
     if (!lobby.stateUpdate(socket, startState, endState)) return;
     if (winner === "draw") {
-      state = "starting virtual server"
+      state = "starting virtual server";
       const startMessage = JSON.stringify({ command: "start virtual server" });
       lobby.stateSend("virtual server not started", startMessage);
       return;
@@ -276,17 +277,17 @@ export const newLobby = (code) => {
   };
 
   lobby.chooseObstacle = () => {
-    state = "choosing obstacle"
+    state = "choosing obstacle";
     const team = winner === "team1" ? team2 : team1;
     const randomPlayer = [...team][Math.floor(team.size * Math.random())];
     randomPlayer.isBuilder = true;
     randomPlayer.json({ command: "start choosing obstacle" });
-  }
+  };
 
   lobby.confirmObstacle = (socket, message) => {
     if (state !== "choosing obstacle") return;
     if (socket.clientState !== "virtual server stopped") return;
-    state = "distributing chosen obstacle"
+    state = "distributing chosen obstacle";
     socket.clientState = "has confirmed obstacle";
     const obstacle = JSON.stringify(message);
     lobby.stateSend("needs confirmed obstacle", obstacle, socket);

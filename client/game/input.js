@@ -16,7 +16,7 @@ export const newMouse = (game) => {
     if (mouse[1] > maxY) mouse[1] = maxY;
 
     const { w, a, s, d } = game.keyboard;
-    if (w || a || s || d) game.inputPreference = "wasd"
+    if (w || a || s || d) game.inputPreference = "wasd";
     else game.inputPreference = "mouse";
   };
 
@@ -52,85 +52,76 @@ export const newMouse = (game) => {
   return mouse;
 };
 
+const MOVEMENT_KEYS = new Set([
+  "KeyW",
+  "KeyA",
+  "KeyS",
+  "KeyD",
+  "Space",
+  "ShiftLeft",
+  "ShiftRight",
+  "ControlLeft",
+  "ControlRight",
+]);
+
 export const newKeyBoard = (game) => {
   const keyboard = {
     shift: false,
     ctrl: false,
-
     w: false,
     a: false,
     s: false,
     d: false,
-
     space: false,
   };
 
-  const keydown = (e) => {
-    if (game.isDead) document.removeEventListener("keydown", keydown);
+  const handleKey = (e, isDown) => {
+    if (game.isDead) return;
+
+    // ----- Block propagation for movement keys -----
+    if (MOVEMENT_KEYS.has(e.code)) {
+      e.stopPropagation(); // prevent your own UI keybind handlers
+      e.preventDefault(); // prevent browser scroll / spacebar page-down
+    }
 
     switch (e.code) {
       case "ShiftLeft":
       case "ShiftRight":
-        (keyboard.shift = true);
+        keyboard.shift = isDown;
         break;
       case "ControlLeft":
       case "ControlRight":
-        (keyboard.ctrl = true);
+        keyboard.ctrl = isDown;
         break;
       case "KeyW":
-        (keyboard.w = true);
+        keyboard.w = isDown;
         break;
       case "KeyA":
-        (keyboard.a = true);
+        keyboard.a = isDown;
         break;
       case "KeyS":
-        (keyboard.s = true);
+        keyboard.s = isDown;
         break;
       case "KeyD":
-        (keyboard.d = true);
+        keyboard.d = isDown;
         break;
       case "Space":
-        (keyboard.space = true);
+        keyboard.space = isDown;
         break;
     }
-
     const { w, a, s, d } = keyboard;
-    if (w || a || s || d) game.inputPreference = "wasd"
+
+    if (isDown && (w || a || s || d)) game.inputPreference = "wasd";
+
+    if (game.mouse.isClicking && !w && !a && !s && !d)
+      game.inputPreference = "mouse";
   };
 
-  const keyup = (e) => {
-    if (game.isDead) document.removeEventListener("keyup", keyup);
+  const keydown = (e) => handleKey(e, true);
+  const keyup = (e) => handleKey(e, false);
 
-    switch (e.code) {
-      case "ShiftLeft":
-      case "ShiftRight":
-        (keyboard.shift = false);
-        break;
-      case "ControlLeft":
-      case "ControlRight":
-        (keyboard.ctrl = false);
-        break;
-      case "KeyW":
-        (keyboard.w = false);
-        break;
-      case "KeyA":
-        (keyboard.a = false);
-        break;
-      case "KeyS":
-        (keyboard.s = false);
-        break;
-      case "KeyD":
-        (keyboard.d = false);
-        break;
-      case "Space":
-        (keyboard.space = false);
-        break;
-    }
-  };
-
-  document.addEventListener("keydown", keydown);
-  document.addEventListener("keyup", keyup);
+  document.addEventListener("keydown", keydown, { passive: false });
+  document.addEventListener("keyup", keyup, { passive: false });
 
   return keyboard;
 };
-

@@ -118,7 +118,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
     log.set("vTick|H", HZ * headroomExp);
     log.set("vTick|S", HZ * (speculExp + headroomExp));
 
-    setTimeout(nextTick, 1000 / HZ)
+    setTimeout(nextTick, 1000 / HZ);
   };
 
   let lastHeadroomTime;
@@ -127,9 +127,7 @@ export const newVirtualServer = (game, app, team1, team2) => {
     const headroomLag = (now - lastHeadroomTime) / (1000 / HZ);
     if (Math.random() > headroomLag) return 0;
     lastHeadroomTime = now;
-    // If the client is not throttling the setTimeout => headroomLag~1
-    // if the client is throttling the headroomLag >> 1
-    return Math.max(1, Math.round(headroomLag * headroomLag));
+    return Math.max(1, Math.round(headroomLag));
   };
 
   const getLamportTick = (lamportTick) => {
@@ -303,7 +301,6 @@ export const newVirtualServer = (game, app, team1, team2) => {
       globalDead.add(player);
     }
   };
-
 
   virtualServer.start = () => {
     virtualServer.startTime = performance.now();

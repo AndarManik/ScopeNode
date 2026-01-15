@@ -13,7 +13,6 @@ export const update = (game, app, delta, team1) => {
   if (!game.playerIsDead) updatePlayerPosition(game, delta);
   updateGlobalPositions(game, delta);
 
-
   if (game.lightGraph) {
     if (!game.playerIsDead) updatePlayerLight(game, team1);
     updateGlobalLights(game, team1);
@@ -27,8 +26,8 @@ export const update = (game, app, delta, team1) => {
 
 const updatePlayerPosition = (game, delta) => {
   const shiftSlow = game.keyboard.shift ? 2 / 3 : 1;
-  const ctrlSlow = game.keyboard.crtl ? 1 / 2 : 1;
-  const moveSpeed = shiftSlow * ctrlSlow * game.moveSpeed
+  const ctrlSlow = game.keyboard.ctrl ? 1 / 2 : 1;
+  const moveSpeed = shiftSlow * ctrlSlow * game.moveSpeed;
   const step = moveSpeed * game.playerRadius * delta;
   const target = getPlayerPathTarget(game);
   game.path = planPath(game, game.playerPosition, target);
@@ -37,7 +36,7 @@ const updatePlayerPosition = (game, delta) => {
 
 const getPlayerPathTarget = (game) => {
   if (game.keyboard.space) return game.playerPosition;
-  if (game.inputPreference === "mouse") return getMouseTarget(game)
+  if (game.inputPreference === "mouse") return getMouseTarget(game);
   else return getWASDTarget(game);
 };
 
@@ -49,18 +48,24 @@ const getMouseTarget = (game) => {
   const dy = my - py;
   const d = Math.hypot(dx, dy);
   if (d === 0) return [px, py];
-  const dist = Math.min(game.playerRadius, d);
+  const dist = Math.min(game.playerRadius / 2, d);
   return [px + (dx / d) * dist, py + (dy / d) * dist];
 };
 
 const getWASDTarget = (game) => {
   const { w, a, s, d } = game.keyboard;
-  const [px, py] = game.playerPosition
+  const [px, py] = game.playerPosition;
   const { playerRadius } = game;
-  const x = d - a;
-  const y = w - s;
-  return [px + x * playerRadius, py + y * playerRadius];
-}
+
+  let x = d - a;
+  let y = w - s;
+
+  if (x === 0 && y === 0) return [px, py];
+  const len = Math.hypot(x, y);
+  x /= len;
+  y /= len;
+  return [px + (x * playerRadius) / 2, py + (y * playerRadius) / 2];
+};
 
 const updateGlobalPositions = (game, delta) => {
   const { moveSpeed, playerRadius } = game;
@@ -78,7 +83,7 @@ const updatePlayerLight = (game, team1) => {
   game.playerLight = game.lightGraph.shineAt(game.playerPosition);
   game.playerLight.push(game.playerPosition);
   const teamLight = game.isTeam1 ? game.team1Lights : game.team2Lights;
-  teamLight.set(game.userId, game.playerLight)
+  teamLight.set(game.userId, game.playerLight);
 };
 
 const updateGlobalLights = (game, team1) => {
@@ -96,7 +101,7 @@ const updatePlayerAim = (game, delta) => {
   const { playerPosition } = game;
   const team1Target = [...game.team1Lights.values()];
   const team2Target = [...game.team2Lights.values()];
-  const teamLight = game.isTeam1 ? game.team1Lights : game.team2Lights
+  const teamLight = game.isTeam1 ? game.team1Lights : game.team2Lights;
   const shooter = teamLight.get(game.userId);
   const enemies = game.isTeam1 ? team2Target : team1Target;
   const rawTarget = registerTarget(shooter, enemies, game.playerRadius);
@@ -170,7 +175,7 @@ export function smoothTargetPos(state, pos, desiredPos, delta) {
 const updateShots = (game, delta) => {
   game.virtualServer.shots.forEach((shot) => {
     if (shot.finished) return;
-    if (shot.anim == null) shot.anim = 0
+    if (shot.anim == null) shot.anim = 0;
     else shot.anim += delta;
   });
-}
+};

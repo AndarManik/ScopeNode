@@ -276,11 +276,11 @@ export const render = (game, team1, team2) => {
     const gunColorSwapped = game.isTeam1 ? color.team2Gun : color.team1Gun;
 
     // Swap gun color only when NO advantage
-    const gunColor = hasAdvantage ? gunColorSwapped : gunColorNormal;
+    const gunColor = !hasAdvantage ? gunColorSwapped : gunColorNormal;
 
     const glowColorNormal = game.isTeam1 ? color.team1Disk : color.team2Disk;
     const glowColorSwapped = game.isTeam1 ? color.team2Disk : color.team1Disk;
-    const glowColor = hasAdvantage ? glowColorSwapped : glowColorNormal;
+    const glowColor = !hasAdvantage ? glowColorSwapped : glowColorNormal;
 
     game.drawPlayer(
       game.playerPosition,
@@ -311,11 +311,11 @@ export const render = (game, team1, team2) => {
     const gunColorSwapped = isTeam1 ? color.team2Gun : color.team1Gun;
 
     // Swap gun color only when NO advantage
-    const gunColor = hasAdvantage ? gunColorSwapped : gunColorNormal;
+    const gunColor = !hasAdvantage ? gunColorSwapped : gunColorNormal;
 
     const glowColorNormal = isTeam1 ? color.team1Disk : color.team2Disk;
     const glowColorSwapped = isTeam1 ? color.team2Disk : color.team1Disk;
-    const glowColor = hasAdvantage ? glowColorSwapped : glowColorNormal;
+    const glowColor = !hasAdvantage ? glowColorSwapped : glowColorNormal;
 
     game.drawPlayer(
       state.position,
