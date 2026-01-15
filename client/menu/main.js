@@ -39,4 +39,8 @@ Touch the center orb to win the round instantly.
       menu.renewEl(info);
     });
   });
+
+  const v = menu.newEl(1, 12, 1, 1);
+  v.innerText = "v0.1.2";
+  v.style.fontSize = "12px";
 };
