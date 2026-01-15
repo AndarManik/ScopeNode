@@ -25,7 +25,7 @@ export const main = (app) => {
   info.style.background = "var(--light)";
   info.addEventListener("click", () => {
     menu.deleteEl(info);
-    const expand = menu.newEl(4, 9, 10, 3, "button");
+    const expand = menu.newEl(4, 9, 10, 2, "button");
     expand.innerText = `You do NOT shoot manually.
 Standing in bright regions of your color kill instantly.
 Standing in bright regions of the other color kill YOU.
