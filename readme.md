@@ -11,3 +11,12 @@ If the round has not finished after 30 seconds, the **Orb** will expand until th
 # **Screen Shot**
 
 <img width="1269" height="959" alt="image" src="https://github.com/user-attachments/assets/83596407-d051-4656-8471-d82cd28f6dcc" />
+
+# Hosting
+
+Go to [scope.rip](https://scope.rip) to try it out.
+
+To self host, clone the repository,
+
+> npm install
+> node server.js
