@@ -1,3 +1,4 @@
+// 100% AI GEN
 export const newStats = (app) => {
   const SAMPLE_MS = 200; // record datapoints
   const RENDER_MS = 1000; // update labels (numbers)

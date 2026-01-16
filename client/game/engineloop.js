@@ -1,6 +1,8 @@
 import { render } from "./render.js";
 import { update } from "./update.js";
 
+// As well as starting the engine, if the settings doesn't have a performance test, it will conduct one.
+
 export const startEngine = (game, app, team1, team2) => {
   const { renderSettings } = game;
 

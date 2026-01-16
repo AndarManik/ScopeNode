@@ -116,9 +116,3 @@ export const newColor = (app) => {
 };
 
 const golden = (i, n = i + 1) => (Math.sqrt(1.25 * n * n) - n / 2) % 1;
-
-// what are the different types of color modes will there be.
-// by default we want the user to get a different hue each refresh.
-// A hue slider would be provided next a button to set randomize hue back on.
-// Pallete elements are provided relative to the hue, an option to make it absolute would also be given
-// A button to default the colors will work

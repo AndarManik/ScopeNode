@@ -12,9 +12,6 @@ export const addUserSettings = (app) => {
   const settings = makePersistentProxy(rawSettings);
   app.settings = settings;
 
-  // -------------------------
-  // game settings
-  // -------------------------
   rawSettings.game = {
     playerRadius: defaultGet("game.playerRadius", 18),
     moveSpeed: defaultGet("game.moveSpeed", 6.25),
@@ -22,9 +19,6 @@ export const addUserSettings = (app) => {
     obstacleStartCount: defaultGet("game.obstacleStartCount", 8),
   };
 
-  // -------------------------
-  // render settings
-  // -------------------------
   rawSettings.render = {
     scale: defaultGet("render.scale", 1),
     preferredSide: defaultGet("render.preferredSide", "left"),
@@ -54,13 +48,8 @@ function makePersistentProxy(obj, baseKey = "") {
         typeof value === "string" ||
         typeof value === "number" ||
         typeof value === "boolean"
-      ) {
-        try {
-          localStorage.setItem(fullKey, String(value));
-        } catch (err) {
-          console.error("localStorage write error in settings proxy:", err);
-        }
-      }
+      )
+        localStorage.setItem(fullKey, String(value));
       return true;
     },
   });
@@ -74,10 +63,6 @@ const getParse = {
 export const defaultGet = (key, defaultValue) => {
   const stored = localStorage.getItem(key);
   if (stored) return getParse[typeof defaultValue]?.(stored) ?? stored;
-  try {
-    localStorage.setItem(key, String(defaultValue));
-  } catch (err) {
-    console.error("localStorage write error in defaultGet:", err);
-  }
+  localStorage.setItem(key, String(defaultValue));
   return defaultValue;
 };
