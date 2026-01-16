@@ -19,4 +19,5 @@ Go to [scope.rip](https://scope.rip) to try it out.
 To self host, clone the repository,
 
 > npm install
+
 > node server.js
