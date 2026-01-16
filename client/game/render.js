@@ -5,6 +5,16 @@ import { animateShot } from "./shootanimation.js";
 
 export const render = (game, team1, team2) => {
   const { renderSettings, color, mapWidth, mapHeight, playerRadius } = game;
+
+  let isTeam1 = game.isTeam1;
+  if (game.xSwap) {
+    team1 = team2;
+    isTeam1 = !isTeam1;
+    const temp = game.team1Lights;
+    game.team1Lights = game.team2Lights;
+    game.team2Lights = temp;
+  }
+
   if (game.scale !== renderSettings.scale || !game.sceneCtx || !game.warpFX) {
     newGameCanvases(game, renderSettings.scale, mapWidth, mapHeight);
 
@@ -21,7 +31,7 @@ export const render = (game, team1, team2) => {
     );
   }
 
-  game.color.intersectPoint = game.isTeam1
+  game.color.intersectPoint = isTeam1
     ? game.color.intersectPoint1
     : game.color.intersectPoint2;
 
@@ -197,7 +207,7 @@ export const render = (game, team1, team2) => {
 
   // mouse position
 
-  ctx.fillStyle = game.isTeam1 ? color.team1Path : color.team2Path;
+  ctx.fillStyle = isTeam1 ? color.team1Path : color.team2Path;
   ctx.beginPath();
   ctx.arc(game.mouse[0], game.mouse[1], playerRadius / 5, 0, Math.PI * 2);
   ctx.fill();
@@ -235,7 +245,7 @@ export const render = (game, team1, team2) => {
     ctx.globalAlpha = alpha;
 
     const pathWidth = 5;
-    ctx.strokeStyle = game.isTeam1 ? color.team1Path : color.team2Path;
+    ctx.strokeStyle = isTeam1 ? color.team1Path : color.team2Path;
     ctx.fillStyle = ctx.strokeStyle;
     ctx.lineWidth = (2 * playerRadius) / pathWidth;
     ctx.lineJoin = "round";
@@ -272,15 +282,15 @@ export const render = (game, team1, team2) => {
     const target = game.playerTarget?.[0];
     const hasAdvantage = game.playerTarget?.[1];
     // Base colors
-    const playerColor = game.isTeam1 ? color.team1Player : color.team2Player;
-    const gunColorNormal = game.isTeam1 ? color.team1Gun : color.team2Gun;
-    const gunColorSwapped = game.isTeam1 ? color.team2Gun : color.team1Gun;
+    const playerColor = isTeam1 ? color.team1Player : color.team2Player;
+    const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
+    const gunColorSwapped = isTeam1 ? color.team2Gun : color.team1Gun;
 
     // Swap gun color only when NO advantage
     const gunColor = !hasAdvantage ? gunColorSwapped : gunColorNormal;
 
-    const glowColorNormal = game.isTeam1 ? color.team1Disk : color.team2Disk;
-    const glowColorSwapped = game.isTeam1 ? color.team2Disk : color.team1Disk;
+    const glowColorNormal = isTeam1 ? color.team1Disk : color.team2Disk;
+    const glowColorSwapped = isTeam1 ? color.team2Disk : color.team1Disk;
     const glowColor = !hasAdvantage ? glowColorSwapped : glowColorNormal;
 
     game.drawPlayer(

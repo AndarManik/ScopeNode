@@ -3,12 +3,10 @@ import { defaultGet } from "./usersettings.js";
 export const newColor = (app) => {
   const color = {};
 
-  color.hueMode = defaultGet("color.hueMode", "random");
+  color.hueMode = defaultGet("color.hueMode", "choice");
+  color.hue = defaultGet("color.hue", 90);
 
   if (color.hueMode === "random") color.hue = Math.floor(Math.random() * 360);
-  if (color.hueMode === "choice")
-    color.hue = parseInt(localStorage.getItem("color.hue"));
-  localStorage.setItem("color.hue", color.hue);
 
   color.setHue = (hue) => {
     color.hue = hue;

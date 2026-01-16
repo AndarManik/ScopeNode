@@ -1,4 +1,4 @@
-const V = "2";
+const V = "3";
 export const addUserSettings = (app) => {
   const version = localStorage.getItem("version");
   if (version != V) {
@@ -31,7 +31,7 @@ export const addUserSettings = (app) => {
   // -------------------------
   rawSettings.render = {
     scale: defaultGet("render.scale", 1),
-    preferredSide: defaultGet("render.preferredSide", "none"),
+    preferredSide: defaultGet("render.preferredSide", "left"),
     bulletSpeed: defaultGet("render.bulletSpeed", 100),
     shellAngle: defaultGet("render.shellAngle", 150),
     glowEnabled: defaultGet("render.glowEnabled", false),
