@@ -10,6 +10,7 @@ import { values } from "./values.js";
 import { update } from "./game/update.js";
 import { render } from "./game/render.js";
 import { newKeyBoard, newMouse } from "./game/input.js";
+import { startEngine } from "./game/engineloop.js";
 
 export const newGame = (app, options, team1, team2) => {
   if (app.game) app.game.isDead = true;
@@ -46,54 +47,9 @@ export const newGame = (app, options, team1, team2) => {
     game.playerLight = [[], []];
   };
 
-  let isFocused = true;
-  let last = performance.now();
-  let timeoutId = null;
-  let rafId = null;
-  const tick = (next) => {
-    if (game.isDead) return;
-    const now = performance.now();
-    const delta = (now - last) / 1000;
-    last = now;
-    try {
-      update(game, app, delta, team1, team2);
-    } catch (err) {
-      console.error("ENGINE UPDATE ERROR:", err);
-    }
-    try {
-      render(game, team1, team2);
-    } catch (err) {
-      console.error("ENGINE RENDER ERROR:", err);
-    }
-    app.stats.log.set("FPS", Math.round(1 / delta));
-    next();
-  };
-
-  const runRAF = () =>
-    isFocused && (rafId = requestAnimationFrame(() => tick(runRAF)));
-  const runTimeout = () =>
-    !isFocused && (timeoutId = setTimeout(() => tick(runTimeout), 1000 / 60));
-
-  window.addEventListener("focus", () => {
-    if (isFocused) return;
-    isFocused = true;
-    clearTimeout(timeoutId);
-    timeoutId = null;
-    last = performance.now();
-    runRAF();
-  });
-
-  window.addEventListener("blur", () => {
-    if (!isFocused) return;
-    isFocused = false;
-    cancelAnimationFrame(rafId);
-    rafId = null;
-    last = performance.now();
-    runTimeout();
-  });
-
   init();
-  tick(runRAF);
+
+  startEngine(game, app, team1, team2);
 
   if (game.isMultiPlayer) {
     game.handleBuildObstacles = () => {

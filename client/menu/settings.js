@@ -224,6 +224,42 @@ export const settings = (app) => {
         },
         numberRowDef("Bullet Speed", settingsObj.render, "bulletSpeed"),
         numberRowDef("Shell Angle", settingsObj.render, "shellAngle"),
+        numberRowDef("FPS Cap", settingsObj.render, "fpsCap"),
+        {
+          height: 1,
+          create: (yBase) => {
+            const elements = [];
+
+            const labelEl = menu.newEl(2, yBase, 4, 1, "div");
+            labelEl.innerText = "vSync";
+            elements.push(labelEl);
+
+            const selectEl = menu.newEl(7, yBase, 9, 1, "select");
+            selectEl.style.backgroundColor = "var(--input)";
+            elements.push(selectEl);
+
+            const current = settingsObj.render.vSync ? "on" : "off";
+
+            const options = [
+              { value: "on", label: "On" },
+              { value: "off", label: "Off" },
+            ];
+
+            for (const opt of options) {
+              const o = document.createElement("option");
+              o.value = opt.value;
+              o.textContent = opt.label;
+              if (opt.value === current) o.selected = true;
+              selectEl.appendChild(o);
+            }
+
+            selectEl.addEventListener("change", () => {
+              settingsObj.render.vSync = selectEl.value === "on";
+            });
+
+            return elements;
+          },
+        },
       ],
     },
     {
@@ -234,7 +270,11 @@ export const settings = (app) => {
         numberRowDef("Player Radius", settingsObj.game, "playerRadius"),
         numberRowDef("Move Speed", settingsObj.game, "moveSpeed"),
         numberRowDef("Obstacle Area", settingsObj.game, "obstacleArea"),
-        numberRowDef("Obstacle Start Count", settingsObj.game, "obstacleStartCount"),
+        numberRowDef(
+          "Obstacle Start Count",
+          settingsObj.game,
+          "obstacleStartCount"
+        ),
       ],
     },
   ];

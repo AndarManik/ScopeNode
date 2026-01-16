@@ -49,10 +49,11 @@ export const newMenu = (app) => {
     const dy = Math.max(rect.top - lightY, 0, lightY - rect.bottom);
     const dist = Math.sqrt(dx * dx + dy * dy);
     const t = Math.max(0, 1 - dist / maxDist);
-    filler.style.opacity = (0.5 * t ** 3).toFixed(2);
+    const opacity = (0.5 * t ** 3).toFixed(2);
+    filler.style.backgroundColor = app.color.fillerColor(opacity);
   };
   let lastTime = performance.now();
-  const update = (now) => {
+  const update = (now = performance.now()) => {
     if (!menu.open) return;
     let dt = (now - lastTime) / 1000; // seconds
     lastTime = now;
@@ -66,9 +67,9 @@ export const newMenu = (app) => {
     lightX += velX * dt;
     lightY += velY * dt;
     fillers.forEach(setFillerColor);
-    requestAnimationFrame(update);
+    setTimeout(update, 1000 / 60);
   };
-  requestAnimationFrame(update);
+  setTimeout(update, 1000 / 60);
 
   // build the grid
   for (let y = 1; y <= rows; y++) {
@@ -77,8 +78,7 @@ export const newMenu = (app) => {
       filler.className = "grid-item";
       filler.style.gridColumn = `${x} / span 1`;
       filler.style.gridRow = `${y} / span 1`;
-      filler.style.opacity = "0";
-      filler.style.backgroundColor = "var(--input)";
+      filler.style.backgroundColor = app.color.fillerColor(0);
       fillers.set(y * cols + x, filler);
       menuEl.appendChild(filler);
     }

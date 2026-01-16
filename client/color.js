@@ -105,6 +105,10 @@ export const newColor = (app) => {
     return `oklch(0.55 0.085 ${obstacleHue})`;
   };
 
+  color.fillerColor = (opacity) => {
+    return `oklch(0.75 0.08 ${color.hue} / ${opacity})`;
+  };
+
   color.setUIByHue();
   color.setGameByHue();
 
