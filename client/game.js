@@ -24,6 +24,8 @@ export const newGame = (app, options, team1, team2) => {
   game.isMultiPlayer = team1 && team2;
   game.userId = game.isMultiPlayer ? app.menu.userId : "player";
   game.isTeam1 = !game.isMultiPlayer || team1.has(game.userId);
+  game.isSpec = false;
+  if (!game.isTeam1 && !team2.has(game.userId)) game.isSpec = true;
   if (!game.isMultiPlayer) team1 = new Set(["player"]);
   if (!game.isMultiPlayer) team2 = new Set(["opponent"]);
   game.spawn1 = [3 * game.playerRadius, game.mapHeight / 2];
@@ -38,7 +40,7 @@ export const newGame = (app, options, team1, team2) => {
   game.virtualServer = newVirtualServer(game, app, team1, team2);
 
   const init = () => {
-    game.playerIsDead = false;
+    game.playerIsDead = false || game.isSpec;
     game.playerPosition = game.isTeam1 ? [...game.spawn1] : [...game.spawn2];
     game.path = [];
     game.playerLight = [[], []];
