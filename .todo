@@ -4,7 +4,8 @@
 [X] force drop obstacle after some time.
 [X] settings
 
-[ ] WASD and mobile input
+[X] WASD 
+[ ] and mobile input
 
 [X] optimize pathing
 [ ] reimplement visibility graph

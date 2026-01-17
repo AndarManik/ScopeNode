@@ -9,38 +9,48 @@ import {
 import { pushManyPathingObstacle, pushPathingObstacle } from "./pathing.js";
 
 export const initializeObstacles = (game, whenDone) => {
-  setupObstacleBlockers(game);
   const style = Math.random() < 0.5 ? mirrorAcrossMap : rotateAcrossMap;
+  setupObstacleBlockers(game, style);
 
   let count = 0;
+  const obstacleArea = game.obstacleArea;
 
   const pushTwo = () => {
+    const alpha = Math.sqrt((2 * count) / game.obstacleStartCount);
+    game.obstacleArea = alpha * obstacleArea + (1 - alpha) * 3;
+
     while (true) {
       let pos = sampleNormal(game);
       if (count === 0) pos[1] = game.mapHeight / 2;
       const obstacle1 = generateObstacle(game, pos);
       const obstacle2 = generateObstacle(game, style(game, pos));
       //not exactly correct close enough without having to create temp objects
-      if (validateNewObstacle(game, obstacle1) === -1) continue;
-      if (validateNewObstacle(game, obstacle2) === -1) continue;
+      validateNewObstacle(game, obstacle1);
+      validateNewObstacle(game, obstacle2);
+      if (obstacle1.index === -1) continue;
+      if (obstacle2.index === -1) continue;
       pushValidObstacle(game, obstacle1);
       pushValidObstacle(game, obstacle2);
       break;
     }
     count += 1;
     if (count <= game.obstacleStartCount / 2)
-      return setTimeout(pushTwo, 1000 / 60);
+      if (whenDone) return pushTwo();
+      else return setTimeout(pushTwo, 1000 / 20);
 
+    game.obstacleArea = obstacleArea;
     pushManyPathingObstacle(game, game.obstacles);
     pushManyLightingObstacles(game, game.obstacles);
-    whenDone();
+    if (whenDone) whenDone();
   };
 
   pushTwo();
 };
 
-export const initializeReceivedObstacles = (game, obstacles) => {
-  setupObstacleBlockers(game);
+export const initializeReceivedObstacles = (game, data) => {
+  const [obstacles, blockers] = data;
+  setupObstacleBlockers(game, mirrorAcrossMap);
+  game.obstacleBlockers = blockers;
   obstacles.forEach((obstacle) => pushValidObstacle(game, obstacle));
   pushManyPathingObstacle(game, game.obstacles);
   pushManyLightingObstacles(game, game.obstacles);
@@ -53,7 +63,7 @@ export const newObstaclePreview = (game, socket) => {
     game.previewAngle,
     game.previewAlpha
   );
-  game.previewObstacle.index = validateNewObstacle(game, game.previewObstacle);
+  validateNewObstacle(game, game.previewObstacle);
 
   if (game.mouse.isClicking && game.previewObstacle.index !== -1) {
     game.choosingObstacle = false;
@@ -93,7 +103,8 @@ export const forceDropNewObstacle = (game, socket) => {
     const angle = Math.PI * 2 * Math.random();
     const alpha = Math.random();
     const obstacle = generateObstacle(game, position, angle, alpha);
-    if (validateNewObstacle(game, obstacle) === -1) continue;
+    validateNewObstacle(game, obstacle);
+    if (obstacle.index === -1) continue;
     addObstacle(game, obstacle);
     socket.json({
       command: "confirm obstacle",
@@ -129,7 +140,7 @@ export const confirmPreviewObstacle = (game, obstacle) => {
 };
 
 export const addObstacle = (game, obstacle) => {
-  pushValidObstacle(game, obstacle);
+  if (!pushValidObstacle(game, obstacle)) return;
   pushPathingObstacle(game, obstacle);
   pushLightingObstacle(game, obstacle);
 };

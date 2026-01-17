@@ -8,3 +8,6 @@ export const removeHoles = (holedPolygon) =>
 
 export const cloneMultiPoly = (multi) =>
   multi.map((poly) => poly.map(([x, y]) => [x, y]));
+
+export const unionNoHoles = (first, second) =>
+  removeHoles(martinez.union(first, second));

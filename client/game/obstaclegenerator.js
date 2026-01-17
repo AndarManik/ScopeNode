@@ -20,7 +20,7 @@ export const generateObstacle = (
   return { poly, pathPoly, previewPoly, position, angle, alpha };
 };
 
-// rotates around[0,0]
+// rotates around [0,0] then translates
 export const transformPoints = ([tx, ty], theta, points) => {
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);

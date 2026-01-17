@@ -1,5 +1,5 @@
 import "./martinez.min.js";
-import { cloneMultiPoly } from "./martinezutil.js";
+import { removeHoles, toMulti, unionNoHoles } from "./martinezutil.js";
 import { pushPathingObstacle } from "./pathing.js";
 // Obstacles are the primary data for two graph based systems.
 // 1. Path planning
@@ -38,87 +38,43 @@ import { pushPathingObstacle } from "./pathing.js";
 //    / /_/   /  --->      / / /___/
 //   /       /  fuse      / /_____
 //  /_______/  outside   /_______/
-
+//
+// There is another case which is subtly banned but it's hard to draw in ascii
+// It's the case where ring closing around an obstacle, the genus would --.
 export const pushValidObstacle = (game, obstacle) => {
-  const { poly, pathPoly } = obstacle;
-
-  const validationIndex = validateNewObstacle(game, obstacle);
+  validateNewObstacle(game, obstacle);
+  const validationIndex = obstacle.index;
   if (validationIndex === -1) return false;
-
   game.obstacles.push(obstacle);
-
-  const multiPathPoly = toMulti(pathPoly);
-
-  const totalWithHoles = martinez.union(game.obstacleTotal, multiPathPoly);
-  game.obstacleTotal = removeHoles(totalWithHoles);
-
+  game.obstacleTotal = obstacle.noHoles;
   if (validationIndex === game.obstacleGroups.length) {
-    game.obstacleGroups.push(multiPathPoly);
-    game.obstacleRenderGroups.push([poly]);
+    game.obstacleGroups.push(obstacle.pathMulti);
+    game.obstacleRenderGroups.push([obstacle.poly]);
     return true;
   }
-
-  const group = game.obstacleGroups[validationIndex];
-  const groupWithHoles = martinez.union(group, multiPathPoly);
-  game.obstacleGroups[validationIndex] = removeHoles(groupWithHoles);
-  game.obstacleRenderGroups[validationIndex].push(poly);
-
+  game.obstacleGroups[validationIndex] = obstacle.group;
+  game.obstacleRenderGroups[validationIndex].push(obstacle.poly);
   return true;
 };
 
 export const validateNewObstacle = (game, obstacle) => {
-  const obstaclePath = toMulti(obstacle.pathPoly);
-  const noHoles = removeHoles(martinez.union(game.obstacleTotal, obstaclePath));
-  if (game.obstacleTotal.length > noHoles.length) return -1;
-
-  const { team1, team2, center } = game.obstacleBlockers;
-  if (martinez.union(noHoles, team1).length <= noHoles.length) return -1;
-  if (martinez.union(noHoles, team2).length <= noHoles.length) return -1;
-  if (martinez.union(noHoles, center).length <= noHoles.length) return -1;
-
-  for (let i = 0; i < game.obstacleGroups.length; i++)
-    if (martinez.union(game.obstacleGroups[i], obstaclePath).length === 1)
-      return i; // hit
-
-  return game.obstacleGroups.length;
+  obstacle.pathMulti = toMulti(obstacle.pathPoly);
+  obstacle.noHoles = unionNoHoles(game.obstacleTotal, obstacle.pathMulti);
+  if (game.obstacleTotal.length > obstacle.noHoles.length)
+    return (obstacle.index = -1);
+  for (const blocker of game.obstacleBlockers) {
+    const withBlocker = martinez.union(obstacle.noHoles, blocker);
+    if (withBlocker.length <= obstacle.noHoles.length)
+      return (obstacle.index = -1);
+  }
+  for (let i = 0; i < game.obstacleGroups.length; i++) {
+    obstacle.group = unionNoHoles(game.obstacleGroups[i], obstacle.pathMulti);
+    if (obstacle.group.length === 1) return (obstacle.index = i); // hit
+  }
+  obstacle.index = game.obstacleGroups.length;
 };
 
-export const pushValidObstaclePair = (game, obstacleA, obstacleB) => {
-  // Clone only the fields that pushValidObstacle mutates
-  const tempGame = {
-    // These are safe shallow copies / fresh arrays
-    obstacles: [...game.obstacles],
-    obstacleTotal: cloneMultiPoly(game.obstacleTotal),
-    obstacleGroups: game.obstacleGroups.map(cloneMultiPoly),
-    obstacleRenderGroups: game.obstacleRenderGroups.map((group) => [...group]),
-    obstacleBlockers: game.obstacleBlockers,
-  };
-
-  if (!pushValidObstacle(tempGame, obstacleA)) {
-    console.log("failed first");
-    return false;
-  }
-  if (!pushValidObstacle(tempGame, obstacleB)) {
-    console.log("failed second");
-    return false;
-  }
-
-  if (!pushValidObstacle(game, obstacleA)) {
-    throw new Error(
-      "pushValidObstaclePair: unexpected failure inserting first obstacle"
-    );
-  }
-
-  if (!pushValidObstacle(game, obstacleB)) {
-    throw new Error(
-      "pushValidObstaclePair: unexpected failure inserting second obstacle"
-    );
-  }
-
-  return true;
-};
-
-export const setupObstacleBlockers = (game) => {
+export const setupObstacleBlockers = (game, transform) => {
   const { playerRadius, mapWidth, mapHeight } = game;
   const wmp = mapWidth - playerRadius;
   const hmp = mapHeight - playerRadius;
@@ -140,10 +96,18 @@ export const setupObstacleBlockers = (game) => {
 
   boundary.forEach((pathPoly) => pushPathingObstacle(game, { pathPoly }));
 
-  const team1 = [[squareAt(game.spawn1)]];
-  const team2 = [[squareAt(game.spawn2)]];
-  const center = [[squareAt(game.centerObjective)]];
-  game.obstacleBlockers = { team1, team2, center };
+  const crossPoint1 = [
+    mapWidth / 8,
+    Math.random() < 0.5 ? playerRadius + 1 : mapHeight - playerRadius - 1,
+  ];
+  const crossPoint2 = transform(game, crossPoint1);
+
+  game.obstacleBlockers = [
+    [[crossbarsAt(crossPoint1, game.centerObjective)]],
+    [[crossbarsAt(crossPoint2, game.centerObjective)]],
+    [[crossbarsAt(game.spawn1, crossPoint1)]],
+    [[crossbarsAt(game.spawn2, crossPoint2)]],
+  ];
 };
 
 const buildBoundaryRect = (left, top, right, bottom) => [
@@ -161,10 +125,47 @@ const squareAt = ([cx, cy]) => [
   [cx - 1, cy - 1],
 ];
 
-const toMulti = (polygon) => [[[...polygon, polygon[0]]]];
+const crossbarsAt = ([cx, cy], [dx, dy]) => {
+  let vx = dx - cx;
+  let vy = dy - cy;
+  const len = Math.hypot(vx, vy);
 
-// skip first cause we use it as the init val reduce
-const removeHoles = (holedPolygon) =>
-  holedPolygon
-    .slice(1)
-    .reduce((a, p) => martinez.union(a, [[p[0]]]), [[holedPolygon[0][0]]]);
+  // Degenerate case: points coincide → just draw the 2x2 square
+  if (len === 0) return squareAt([cx, cy]);
+
+  // Unit direction from c → d
+  vx /= len;
+  vy /= len;
+
+  // Perpendicular unit vector
+  const nx = -vy;
+  const ny = vx;
+
+  // Rectangle parameters
+  const halfWidth = len / 2; // along the line between the points
+  const halfHeight = 1; // total height = 2
+
+  // Center at midpoint between the two points
+  const mx = (cx + dx) / 2;
+  const my = (cy + dy) / 2;
+
+  // Four corners (counter-clockwise) and close the polygon
+  const p1 = [
+    mx - vx * halfWidth - nx * halfHeight,
+    my - vy * halfWidth - ny * halfHeight,
+  ];
+  const p2 = [
+    mx + vx * halfWidth - nx * halfHeight,
+    my + vy * halfWidth - ny * halfHeight,
+  ];
+  const p3 = [
+    mx + vx * halfWidth + nx * halfHeight,
+    my + vy * halfWidth + ny * halfHeight,
+  ];
+  const p4 = [
+    mx - vx * halfWidth + nx * halfHeight,
+    my - vy * halfWidth + ny * halfHeight,
+  ];
+
+  return [p1, p2, p3, p4, p1];
+};

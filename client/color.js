@@ -21,6 +21,7 @@ export const newColor = (app) => {
   color.setGameByHue = () => {
     const hue = color.hue;
     color.background = `oklch(0.09 0.015 ${hue})`;
+    color.backgroundBrilliant = `oklch(0.35 0.025 ${hue})`;
 
     color.team1Player = `oklch(0.82 0.088 ${hue + 60})`;
     color.team2Player = `oklch(0.82 0.088 ${hue - 60})`;

@@ -52,7 +52,10 @@ export const newGame = (app, options, team1, team2) => {
   if (game.isMultiPlayer) {
     game.handleBuildObstacles = () => {
       initializeObstacles(game, () =>
-        app.socket.json({ command: "obstacles", obstacles: game.obstacles })
+        app.socket.json({
+          command: "obstacles",
+          obstacles: [game.obstacles, game.obstacleBlockers],
+        })
       );
     };
 
@@ -206,21 +209,21 @@ const parseGameOptions = (app, game, options) => {
     case "small":
       game.playerRadius = 18;
       game.moveSpeed = 6.25;
-      game.obstacleArea = 5.5;
-      game.obstacleStartCount = 8;
+      game.obstacleArea = 6;
+      game.obstacleStartCount = 20;
       break;
 
     case "medium":
       game.playerRadius = 14;
       game.moveSpeed = 6.25;
-      game.obstacleArea = 5.5;
-      game.obstacleStartCount = 12;
+      game.obstacleArea = 6;
+      game.obstacleStartCount = 30;
       break;
     case "large":
       game.playerRadius = 12;
       game.moveSpeed = 6.25;
-      game.obstacleArea = 5.5;
-      game.obstacleStartCount = 16;
+      game.obstacleArea = 6;
+      game.obstacleStartCount = 50;
       break;
   }
 };

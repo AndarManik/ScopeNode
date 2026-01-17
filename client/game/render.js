@@ -67,6 +67,18 @@ export const render = (game, team1, team2) => {
       );
       game.obstacles.pop();
     }
+    ctx.strokeStyle = color.backgroundBrilliant;
+    ctx.lineWidth = 2 * playerRadius;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    game.obstacleBlockers.forEach(([[blocker]]) => {
+      ctx.beginPath();
+      ctx.moveTo(blocker[0][0], blocker[0][1]);
+      for (let k = 1; k < blocker.length; k++)
+        ctx.lineTo(blocker[k][0], blocker[k][1]);
+      ctx.closePath();
+      ctx.stroke();
+    });
 
     ctx.save();
     ctx.globalAlpha = 0.5;
