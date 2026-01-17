@@ -8,13 +8,16 @@ import {
 } from "./obstaclevalidator.js";
 import { pushManyPathingObstacle, pushPathingObstacle } from "./pathing.js";
 
-export const initializeObstacles = (game) => {
+export const initializeObstacles = (game, whenDone) => {
   setupObstacleBlockers(game);
   const style = Math.random() < 0.5 ? mirrorAcrossMap : rotateAcrossMap;
-  for (let i = 0; i < game.obstacleStartCount / 2; i++) {
+
+  let count = 0;
+
+  const pushTwo = () => {
     while (true) {
       let pos = sampleNormal(game);
-      if (i === 0) pos[1] = game.mapHeight / 2;
+      if (count === 0) pos[1] = game.mapHeight / 2;
       const obstacle1 = generateObstacle(game, pos);
       const obstacle2 = generateObstacle(game, style(game, pos));
       //not exactly correct close enough without having to create temp objects
@@ -24,9 +27,16 @@ export const initializeObstacles = (game) => {
       pushValidObstacle(game, obstacle2);
       break;
     }
-  }
-  pushManyPathingObstacle(game, game.obstacles);
-  pushManyLightingObstacles(game, game.obstacles);
+    count += 1;
+    if (count <= game.obstacleStartCount / 2)
+      return setTimeout(pushTwo, 1000 / 60);
+
+    pushManyPathingObstacle(game, game.obstacles);
+    pushManyLightingObstacles(game, game.obstacles);
+    whenDone();
+  };
+
+  pushTwo();
 };
 
 export const initializeReceivedObstacles = (game, obstacles) => {

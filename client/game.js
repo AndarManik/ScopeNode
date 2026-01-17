@@ -7,8 +7,6 @@ import {
 } from "./game/arena.js";
 import { newVirtualServer } from "./game/virtualserver.js";
 import { values } from "./values.js";
-import { update } from "./game/update.js";
-import { render } from "./game/render.js";
 import { newKeyBoard, newMouse } from "./game/input.js";
 import { startEngine } from "./game/engineloop.js";
 
@@ -53,8 +51,9 @@ export const newGame = (app, options, team1, team2) => {
 
   if (game.isMultiPlayer) {
     game.handleBuildObstacles = () => {
-      initializeObstacles(game);
-      app.socket.json({ command: "obstacles", obstacles: game.obstacles });
+      initializeObstacles(game, () =>
+        app.socket.json({ command: "obstacles", obstacles: game.obstacles })
+      );
     };
 
     game.handleObstacles = (obstacles) => {
