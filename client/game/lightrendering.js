@@ -30,9 +30,9 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
       t2b: makeBuffer(), // HARD T2b
       softT2b: makeBuffer(), // SOFT T2b
     },
-    // Intersections (HARD)
-    intersectPoint: makeBuffer(),
-    intersectDisk: makeBuffer(),
+    // Intersections
+    intersectPoint: makeBuffer(), // HARD T1 ∩ T1
+    intersectDisk: makeBuffer(), // UNION of soft∩soft and hard∩hard
     // Shared
     tint: makeBuffer(),
     background: makeBuffer(),
@@ -158,6 +158,49 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
 
     cctx.globalCompositeOperation = "destination-in";
     cctx.drawImage(maskB, 0, 0);
+
+    cctx.globalCompositeOperation = "source-over";
+  };
+
+  // NEW: build UNION of (softA ∩ softB) and (hardA ∩ hardB) into buf
+  const buildUnionDiskIntersectionInto = (
+    softA,
+    softB,
+    hardA,
+    hardB,
+    buf,
+    scratch
+  ) => {
+    const cctx = buf.ctx;
+    clearCanvas(cctx);
+
+    const hasSoft = softA && softB;
+    const hasHard = hardA && hardB;
+
+    if (!hasSoft && !hasHard) return;
+
+    // soft∩soft → buf
+    if (hasSoft) {
+      cctx.globalCompositeOperation = "source-over";
+      cctx.drawImage(softA, 0, 0);
+      cctx.globalCompositeOperation = "destination-in";
+      cctx.drawImage(softB, 0, 0);
+    }
+
+    // hard∩hard → scratch, then OR into buf
+    if (hasHard) {
+      const sctx = scratch.ctx;
+      clearCanvas(sctx);
+
+      sctx.globalCompositeOperation = "source-over";
+      sctx.drawImage(hardA, 0, 0);
+      sctx.globalCompositeOperation = "destination-in";
+      sctx.drawImage(hardB, 0, 0);
+
+      // OR/union: just paint the hard intersection over the soft one
+      cctx.globalCompositeOperation = "source-over";
+      cctx.drawImage(scratch.canvas, 0, 0);
+    }
 
     cctx.globalCompositeOperation = "source-over";
   };
@@ -299,26 +342,37 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
       playerRadius
     );
 
-    // Clip HARD T2b (both teams) against expanded obstacles
     subtractMaskInPlace(buffers.team1.t2b.ctx, obstacleExpandedMask);
     subtractMaskInPlace(buffers.team2.t2b.ctx, obstacleExpandedMask);
 
-    // 3) Build intersections (raw overlap) on HARD T2b
+    // 3) Build intersection of T1 (hard) and subtract from T1 masks
     buildIntersectionInto(
       t1Masks.t1Mask,
       t2Masks.t1Mask,
       buffers.intersectPoint
     );
-    buildIntersectionInto(
-      t1Masks.t2bSoftMask,
-      t2Masks.t2bSoftMask,
-      buffers.intersectDisk
-    );
 
-    // 4) Subtract intersections from HARD masks so intersection is isolated
     subtractMaskInPlace(buffers.team1.point.ctx, buffers.intersectPoint.canvas);
     subtractMaskInPlace(buffers.team2.point.ctx, buffers.intersectPoint.canvas);
 
+    // 3.5) Ensure SOFT T2b does NOT overlap HARD T2b (separate soft/hard first)
+    subtractMaskInPlace(buffers.team1.softT2b.ctx, buffers.team1.t2b.canvas);
+    subtractMaskInPlace(buffers.team2.softT2b.ctx, buffers.team2.t2b.canvas);
+
+    // 4) Build INTERSECT DISK as:
+    //    (softT2b₁ ∩ softT2b₂) ∪ (hardT2b₁ ∩ hardT2b₂),
+    //    using the already-separated masks
+    buildUnionDiskIntersectionInto(
+      buffers.team1.softT2b.canvas,
+      buffers.team2.softT2b.canvas,
+      buffers.team1.t2b.canvas,
+      buffers.team2.t2b.canvas,
+      buffers.intersectDisk,
+      buffers.tint // scratch
+    );
+
+    // 4.5) Carve INTERSECT DISK out of both soft and hard T2b
+    //      so the intersection region is isolated into intersectDisk.
     subtractMaskInPlace(
       buffers.team1.softT2b.ctx,
       buffers.intersectDisk.canvas
@@ -327,6 +381,8 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
       buffers.team2.softT2b.ctx,
       buffers.intersectDisk.canvas
     );
+    subtractMaskInPlace(buffers.team1.t2b.ctx, buffers.intersectDisk.canvas);
+    subtractMaskInPlace(buffers.team2.t2b.ctx, buffers.intersectDisk.canvas);
 
     // 5) Build background mask AFTER HARD masks are finalized
     //    NOTE: background uses ORIGINAL obstacles (no expansion)
@@ -358,17 +414,15 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
       maybeGlow(color.intersectDisk)
     );
 
-    // 3) Draw SOFT T2b (original disk \ T1), un-clipped but under HARD T2b
-    //    These give you "soft-disk" areas where center LOS exists,
-    //    even if a full-radius body can't get a kill.
+    // 3) Draw SOFT T2b (disk \ T1 \ HARD T2b \ INTERSECT DISK), under HARD T2b
     paintMask(t1Masks.t2bSoftMask, color.team1Disk, maybeGlow(color.team1Disk));
     paintMask(t2Masks.t2bSoftMask, color.team2Disk, maybeGlow(color.team2Disk));
 
-    // 4) Draw HARD T2b (now WITHOUT intersection and obstacle-expanded)
+    // 4) Draw HARD T2b (disk \ T1-expanded \ obstacles \ INTERSECT DISK)
     paintMask(t1Masks.t2bMask, color.team2Disk, maybeGlow(color.team2Disk));
     paintMask(t2Masks.t2bMask, color.team1Disk, maybeGlow(color.team1Disk));
 
-    // 5) Draw intersection of HARD T2b
+    // 5) Draw intersection of (soft∩soft) ∪ (hard∩hard)
     paintMask(
       buffers.intersectDisk.canvas,
       color.intersectDisk,
