@@ -39,19 +39,14 @@ export const startEngine = (game, app, team1, team2) => {
   let rafId = null;
   let timeoutId = null;
 
-  const getDesiredIntervalMs = (cap = renderSettings.fpsCap) => {
-    if (cap == null || cap < 0) return 0;
-    return 1000 / cap;
-  };
+  const getDesiredIntervalMs = (cap = renderSettings.fpsCap) =>
+    cap == null || cap < 0 ? 0 : 1000 / cap;
 
   const scheduleNext = () => {
     const interval = getDesiredIntervalMs();
-    const preferRAF =
-      isFocused &&
-      renderSettings.vSync &&
-      typeof requestAnimationFrame === "function";
-    // Some browsers don't even have rAF
-
+    let preferRAF = isFocused;
+    preferRAF &&= renderSettings.vSync;
+    preferRAF &&= typeof requestAnimationFrame === "function";
     if (preferRAF) rafId = requestAnimationFrame(tick);
     else timeoutId = setTimeout(tick, interval > 0 ? interval : 0);
   };
@@ -63,7 +58,6 @@ export const startEngine = (game, app, team1, team2) => {
     if (totalSamples <= WARMUP_SAMPLES) return;
 
     samplesMs.push(deltaMs);
-
     const needed = stage === 0 ? BASE_SAMPLE_COUNT : sampleCount;
     if (samplesMs.length < needed) return;
 
@@ -72,7 +66,6 @@ export const startEngine = (game, app, team1, team2) => {
     const median = slowHalf[Math.floor(slowHalf.length / 2)];
 
     if (stage === 0) fpsThreshold = 1.1 * median;
-
     console.log({ stage: stages[stage], median, fpsThreshold });
 
     if (stage > 0 && median > fpsThreshold) {
@@ -124,22 +117,29 @@ export const startEngine = (game, app, team1, team2) => {
     scheduleNext();
   };
 
-  window.addEventListener("focus", () => {
+  const focus = () => {
+    if (game.isDead) window.removeEventListener("focus", focus);
+
     if (isFocused) return;
     isFocused = true;
     clearTimeout(timeoutId);
     last = performance.now(); // reset timing
     scheduleNext();
-  });
+  };
 
-  window.addEventListener("blur", () => {
+  const blur = () => {
+    if (game.isDead) window.removeEventListener("blur", blur);
+
     if (!isFocused) return;
     isFocused = false;
     cancelAnimationFrame(rafId);
     clearTimeout(timeoutId);
     last = performance.now();
     scheduleNext();
-  });
+  };
+
+  window.addEventListener("focus", focus);
+  window.addEventListener("blur", blur);
 
   scheduleNext();
 };

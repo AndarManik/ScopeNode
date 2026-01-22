@@ -33,6 +33,11 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     // Intersections
     intersectPoint: makeBuffer(), // HARD T1 ∩ T1
     intersectDisk: makeBuffer(), // UNION of soft∩soft and hard∩hard
+
+    // NEW: unions for per-team disk coloring
+    team1DiskUnion: makeBuffer(), // soft₁ ∪ hard₂
+    team2DiskUnion: makeBuffer(), // soft₂ ∪ hard₁
+
     // Shared
     tint: makeBuffer(),
     background: makeBuffer(),
@@ -96,7 +101,7 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
         cctx.strokeStyle = "white";
         cctx.lineJoin = "round";
         cctx.lineCap = "round";
-        cctx.lineWidth = 2 * playerRadius; // world units; transform scales it
+        cctx.lineWidth = 2.05 * playerRadius; // world units; transform scales it
         for (const [pointPoly] of team) {
           drawPolygonFillAndStroke(cctx, pointPoly);
         }
@@ -205,6 +210,24 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     cctx.globalCompositeOperation = "source-over";
   };
 
+  // NEW: simple union builder for two masks
+  const buildUnionInto = (maskA, maskB, buf) => {
+    const cctx = buf.ctx;
+    clearCanvas(cctx);
+
+    if (maskA) {
+      cctx.globalCompositeOperation = "source-over";
+      cctx.drawImage(maskA, 0, 0);
+    }
+    if (maskB) {
+      cctx.globalCompositeOperation = "source-over";
+      cctx.drawImage(maskB, 0, 0);
+    }
+
+    cctx.globalCompositeOperation = "source-over";
+    return buf.canvas;
+  };
+
   // Helper: subtract subtractCanvas from targetCtx in-place
   const subtractMaskInPlace = (targetCtx, subtractCanvas) => {
     if (!subtractCanvas) return;
@@ -270,10 +293,9 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
       octx.strokeStyle = "white";
       octx.lineJoin = "round";
       octx.lineCap = "round";
-      octx.lineWidth = 2 * playerRadius;
-      for (const { poly } of excludedPolygons) {
+      octx.lineWidth = 2.05 * playerRadius;
+      for (const { poly } of excludedPolygons)
         drawPolygonFillAndStroke(octx, poly);
-      }
     });
 
     return obstacleExpanded.canvas;
@@ -384,6 +406,21 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     subtractMaskInPlace(buffers.team1.t2b.ctx, buffers.intersectDisk.canvas);
     subtractMaskInPlace(buffers.team2.t2b.ctx, buffers.intersectDisk.canvas);
 
+    // 4.75) Build per-team disk coloring masks:
+    // team1Disk = soft₁ ∪ hard₂
+    // team2Disk = soft₂ ∪ hard₁
+    const team1DiskMask = buildUnionInto(
+      buffers.team1.softT2b.canvas,
+      buffers.team2.t2b.canvas,
+      buffers.team1DiskUnion
+    );
+
+    const team2DiskMask = buildUnionInto(
+      buffers.team2.softT2b.canvas,
+      buffers.team1.t2b.canvas,
+      buffers.team2DiskUnion
+    );
+
     // 5) Build background mask AFTER HARD masks are finalized
     //    NOTE: background uses ORIGINAL obstacles (no expansion)
     const backgroundMask = buildBackgroundMask(
@@ -414,13 +451,11 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
       maybeGlow(color.intersectDisk)
     );
 
-    // 3) Draw SOFT T2b (disk \ T1 \ HARD T2b \ INTERSECT DISK), under HARD T2b
-    paintMask(t1Masks.t2bSoftMask, color.team1Disk, maybeGlow(color.team1Disk));
-    paintMask(t2Masks.t2bSoftMask, color.team2Disk, maybeGlow(color.team2Disk));
+    // 3) Draw TEAM 1 disk region = soft₁ ∪ hard₂
+    paintMask(team1DiskMask, color.team1Disk, maybeGlow(color.team1Disk));
 
-    // 4) Draw HARD T2b (disk \ T1-expanded \ obstacles \ INTERSECT DISK)
-    paintMask(t1Masks.t2bMask, color.team2Disk, maybeGlow(color.team2Disk));
-    paintMask(t2Masks.t2bMask, color.team1Disk, maybeGlow(color.team1Disk));
+    // 4) Draw TEAM 2 disk region = soft₂ ∪ hard₁
+    paintMask(team2DiskMask, color.team2Disk, maybeGlow(color.team2Disk));
 
     // 5) Draw intersection of (soft∩soft) ∪ (hard∩hard)
     paintMask(

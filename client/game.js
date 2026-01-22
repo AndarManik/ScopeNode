@@ -206,7 +206,9 @@ const parseGameOptions = (app, game, options) => {
   Object.assign(game, app.settings.game);
 
   switch (options) {
+    // comments are the area of the map relative to the player
     case "small":
+      //2427.25925926
       game.playerRadius = 18;
       game.moveSpeed = 6.25;
       game.obstacleArea = 6;
@@ -214,16 +216,18 @@ const parseGameOptions = (app, game, options) => {
       break;
 
     case "medium":
+      //4012.40816327
       game.playerRadius = 14;
       game.moveSpeed = 6.25;
       game.obstacleArea = 6;
-      game.obstacleStartCount = 30;
+      game.obstacleStartCount = 33;
       break;
     case "large":
+      //5461.33333333
       game.playerRadius = 12;
       game.moveSpeed = 6.25;
       game.obstacleArea = 6;
-      game.obstacleStartCount = 50;
+      game.obstacleStartCount = 45;
       break;
   }
 };

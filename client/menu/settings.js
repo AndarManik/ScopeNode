@@ -112,15 +112,15 @@ export const settings = (app) => {
           create: (yBase) => {
             const elements = [];
             const samples = [
-              "--lightLeft",
-              "--light",
-              "--lightRight",
-              "--inputLeft",
-              "--input",
-              "--inputRight",
               "--inputLeftOff",
+              "--lightLeft",
+              "--inputLeft",
               "--inputOff",
+              "--light",
+              "--input",
               "--inputRightOff",
+              "--lightRight",
+              "--inputRight",
             ];
             const startX = 7;
             const endX = 15;

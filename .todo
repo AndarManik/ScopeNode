@@ -1,6 +1,9 @@
-[ ] finalize lobby join exit reconnect
-[ ] rework main main
+[X] finalize lobby join exit reconnect
+[ ] finalize spectator
+
+[X] rework main main
 [ ] add in game menu view
+
 [X] force drop obstacle after some time.
 [X] settings
 

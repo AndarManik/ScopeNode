@@ -150,6 +150,7 @@ export const newLobby = (code) => {
 
   lobby.startGame = () => {
     if (state !== "lobby") return;
+    if (!team1.size || !team2.size) return;
     state = "starting game";
 
     const toWinMap = { small: 4, medium: 6, large: 8 };

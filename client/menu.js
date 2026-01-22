@@ -41,8 +41,8 @@ export const newMenu = (app) => {
     mouseX = event.clientX;
     mouseY = event.clientY;
   });
-  const stiffness = 30; // k: higher = snappier spring
-  const damping = 10; // c: higher = more damped
+  const stiffness = 30;
+  const damping = 11;
   const setFillerColor = (filler) => {
     const rect = filler.getBoundingClientRect();
     const dx = Math.max(rect.left - lightX, 0, lightX - rect.right);

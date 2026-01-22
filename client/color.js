@@ -20,29 +20,29 @@ export const newColor = (app) => {
 
   color.setGameByHue = () => {
     const hue = color.hue;
-    color.background = `oklch(0.09 0.015 ${hue})`;
-    color.backgroundBrilliant = `oklch(0.35 0.025 ${hue})`;
+    color.background = `oklch(0.25 0.005 ${hue})`;
+    color.backgroundBrilliant = `oklch(0.15 0.015 ${hue})`;
 
-    color.team1Player = `oklch(0.82 0.088 ${hue + 60})`;
-    color.team2Player = `oklch(0.82 0.088 ${hue - 60})`;
-    color.centerObjective = `oklch(0.82 0.088 ${hue})`;
+    color.team1Player = `oklch(0.85 0.075 ${hue + 72})`;
+    color.team2Player = `oklch(0.85 0.075 ${hue - 72})`;
+    color.centerObjective = `oklch(0.85 0.075 ${hue})`;
 
-    color.team1Path = `oklch(0.90 0.018 ${hue + 60})`;
-    color.team2Path = `oklch(0.90 0.018 ${hue - 60})`;
+    color.team1Path = `oklch(0.90 0.040 ${hue + 72})`;
+    color.team2Path = `oklch(0.90 0.040 ${hue - 72})`;
 
     color.team1Point = `oklch(0.35 0.025 ${hue + 45})`;
     color.team2Point = `oklch(0.35 0.025 ${hue - 45})`;
 
-    color.intersectPoint1 = `oklch(0.25 0.030 ${hue - 45})`;
-    color.intersectPoint2 = `oklch(0.25 0.030 ${hue + 45})`;
+    color.intersectPoint1 = `oklch(0.45 0.045 ${hue - 60})`;
+    color.intersectPoint2 = `oklch(0.45 0.045 ${hue + 60})`;
 
-    color.team1Disk = `oklch(0.75 0.125 ${hue + 60})`;
-    color.team2Disk = `oklch(0.75 0.125 ${hue - 60})`;
+    color.team1Disk = `oklch(0.75 0.125 ${hue + 72})`;
+    color.team2Disk = `oklch(0.75 0.125 ${hue - 72})`;
     color.objectiveDisk = `oklch(0.75 0.125 ${hue})`;
     color.intersectDisk = `oklch(0.86 0.065 ${hue})`;
 
-    color.team1Bullet = `oklch(0.90 0.045 ${hue + 60})`;
-    color.team2Bullet = `oklch(0.90 0.045 ${hue - 60})`;
+    color.team1Bullet = `oklch(0.90 0.045 ${hue + 72})`;
+    color.team2Bullet = `oklch(0.90 0.045 ${hue - 72})`;
 
     color.team1Gun = `oklch(0.60 0.100 ${hue + 45})`;
     color.team2Gun = `oklch(0.60 0.100 ${hue - 45})`;
@@ -50,16 +50,16 @@ export const newColor = (app) => {
 
   color.setUIByHue = () => {
     const hue = color.hue;
-    color.dark = `oklch(0.09 0.015 ${hue})`;
+    color.dark = `oklch(0.25 0.005 ${hue})`;
 
-    color.transDark = `oklch(0.09 0.015 ${hue} / 0.5)`;
+    color.transDark = `oklch(0.15 0.015 ${hue} / 0.25)`;
     color.input = `oklch(0.75 0.08 ${hue})`;
     color.inputLeft = `oklch(0.75 0.08 ${hue + 45})`;
     color.inputRight = `oklch(0.75 0.08 ${hue - 45})`;
 
-    color.inputOff = `oklch(0.45 0.050 ${hue})`;
-    color.inputLeftOff = `oklch(0.45 0.050 ${hue + 45})`;
-    color.inputRightOff = `oklch(0.45 0.050 ${hue - 45})`;
+    color.inputOff = `oklch(0.55 0.050 ${hue})`;
+    color.inputLeftOff = `oklch(0.55 0.050 ${hue + 45})`;
+    color.inputRightOff = `oklch(0.55 0.050 ${hue - 45})`;
 
     color.light = `oklch(0.90 0.045 ${hue})`;
     color.lightLeft = `oklch(0.90 0.045 ${hue + 45})`;
@@ -107,7 +107,7 @@ export const newColor = (app) => {
   };
 
   color.fillerColor = (opacity) => {
-    return `oklch(0.75 0.08 ${color.hue} / ${opacity})`;
+    return `oklch(0.15 0.015 ${color.hue} / ${opacity})`;
   };
 
   color.setUIByHue();

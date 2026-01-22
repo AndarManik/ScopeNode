@@ -8,6 +8,8 @@ export const addUserSettings = (app) => {
 
   app.name = localStorage.getItem("name");
 
+  app.isMobile = isMobile();
+
   const rawSettings = {};
   const settings = makePersistentProxy(rawSettings);
   app.settings = settings;
@@ -30,6 +32,14 @@ export const addUserSettings = (app) => {
     firstRender: defaultGet("render.firstRender", true),
   };
 };
+
+function isMobile() {
+  const touch = navigator.maxTouchPoints > 0;
+  const small = Math.min(window.innerWidth, window.innerHeight) < 900;
+  const uaMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const votes = [touch, small, uaMobile].filter(Boolean).length;
+  return votes >= 2;
+}
 
 function makePersistentProxy(obj, baseKey = "") {
   return new Proxy(obj, {
