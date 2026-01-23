@@ -152,7 +152,7 @@ export const newStats = (app) => {
   const drawGraph = (entry) => {
     const { ctx, canvas, series } = entry;
 
-    const EMA_ALPHA = 0.18;
+    const EMA_ALPHA = 0.1;
     const ROBUST_RANGE = true;
     const STD_K = 2.5;
     const PAD_PX = 1;

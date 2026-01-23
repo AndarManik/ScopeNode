@@ -21,22 +21,28 @@ export const newGame = (app, options, team1, team2) => {
   game.color = app.color;
 
   game.isMultiPlayer = team1 && team2;
+
   game.userId = game.isMultiPlayer ? app.menu.userId : "player";
   game.isTeam1 = !game.isMultiPlayer || team1.has(game.userId);
   game.isSpec = false;
   if (!game.isTeam1 && !team2.has(game.userId)) game.isSpec = true;
-  if (!game.isMultiPlayer) team1 = new Set(["player"]);
-  if (!game.isMultiPlayer) team2 = new Set(["opponent"]);
+
   game.spawn1 = [3 * game.playerRadius, game.mapHeight / 2];
   game.spawn2 = [game.mapWidth - 3 * game.playerRadius, game.mapHeight / 2];
   game.centerObjective = [game.mapWidth / 2, game.mapHeight / 2];
+
+  if (!game.isMultiPlayer) {
+    team1 = new Set(["player"]);
+    team2 = new Set(["opponent"]);
+    game.bots = [];
+    game.bots.push({ uuid: "opponent", position: [...game.spawn2] });
+  }
 
   game.previewAlpha = 0;
   game.previewAngle = 0;
 
   game.mouse = newMouse(game, app.menu);
   game.keyboard = newKeyBoard(game, app.menu);
-  game.virtualServer = newVirtualServer(game, app, team1, team2);
 
   const init = () => {
     game.playerIsDead = false || game.isSpec;
@@ -193,7 +199,6 @@ export const newGame = (app, options, team1, team2) => {
     app.socket.json({ command: "client ready" });
   } else {
     initializeObstacles(game);
-    game.virtualServer.start();
     game.handleMessage = () => {};
     game.updatePlayers = () => {};
   }

@@ -99,14 +99,7 @@ void main() {
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
   gl.bufferData(
     gl.ARRAY_BUFFER,
-    new Float32Array([
-      -1, -1,
-       1, -1,
-      -1,  1,
-      -1,  1,
-       1, -1,
-       1,  1
-    ]),
+    new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
     gl.STATIC_DRAW
   );
 
@@ -138,7 +131,12 @@ void main() {
     gl.viewport(0, 0, w, h);
   }
 
-  function render({ pointsPx, ampPx = 12, sigmaPx = 140, xSwap = false }) {
+  function render({
+    pointsPx = [],
+    ampPx = 12,
+    sigmaPx = 140,
+    xSwap = false,
+  } = {}) {
     resizeToMatchSource();
 
     gl.bindTexture(gl.TEXTURE_2D, sceneTex);

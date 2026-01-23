@@ -10,7 +10,6 @@ export const render = (game, team1, team2) => {
   ({ team1, isTeam1 } = applyXSwap(game, team1, team2, isTeam1));
 
   ensureSceneCanvases(game, renderSettings, mapWidth, mapHeight);
-  ensureLightAndPlayerRenderers(game, mapWidth, mapHeight);
 
   game.color.intersectPoint = isTeam1
     ? game.color.intersectPoint1
@@ -27,9 +26,24 @@ export const render = (game, team1, team2) => {
   }
 
   renderTeamLights(game, color, renderSettings);
-  
   renderMouseDot(ctx, game, isTeam1, color, playerRadius);
 
+  if (game.isMultiPlayer) multiPlayerRender(game, ctx, team1, isTeam1);
+  else singlePlayerRender(game, ctx, isTeam1);
+};
+
+const singlePlayerRender = (game, ctx, isTeam1) => {
+  const { color, playerRadius } = game;
+  renderPlayerPath(ctx, game, isTeam1, color, playerRadius);
+  renderLocalPlayer(game, isTeam1);
+  renderBots(game);
+  game.warpFX.render({ xSwap: game.xSwap });
+};
+
+const renderBots = (game) => {};
+
+const multiPlayerRender = (game, ctx, team1, isTeam1) => {
+  const { renderSettings, color, mapWidth, mapHeight, playerRadius } = game;
   if (!game.playerIsDead) {
     renderPlayerPath(ctx, game, isTeam1, color, playerRadius);
     renderLocalPlayer(game, isTeam1);
@@ -47,10 +61,6 @@ export const render = (game, team1, team2) => {
 
   renderShotsAndWarp(game, ctx, playerRadius);
 };
-
-/* ----------------------------------------------------------
- * Top-level helpers
- * ---------------------------------------------------------- */
 
 const applyXSwap = (game, team1, team2, isTeam1) => {
   if (!game.xSwap) return { team1, isTeam1 };
@@ -70,26 +80,18 @@ const ensureSceneCanvases = (game, renderSettings, mapWidth, mapHeight) => {
     return;
 
   newGameCanvases(game, renderSettings.scale, mapWidth, mapHeight);
-};
 
-const ensureLightAndPlayerRenderers = (game, mapWidth, mapHeight) => {
-  if (!game.sceneCtx) return;
+  game.lightRenderer = createTeamsVisionRenderer(
+    game.sceneCtx,
+    mapWidth,
+    mapHeight,
+    game.scale
+  );
 
-  if (!game.lightRenderer) {
-    game.lightRenderer = createTeamsVisionRenderer(
-      game.sceneCtx,
-      mapWidth,
-      mapHeight,
-      game.scale
-    );
-  }
-
-  if (!game.drawPlayer) {
-    Object.assign(
-      game,
-      createPlayerRenderer(game.sceneCtx, mapWidth, mapHeight, game.scale)
-    );
-  }
+  Object.assign(
+    game,
+    createPlayerRenderer(game.sceneCtx, mapWidth, mapHeight, game.scale)
+  );
 };
 
 const clearScene = (ctx, color, mapWidth, mapHeight) => {
@@ -255,10 +257,8 @@ const renderObjectiveIfNeeded = (
   mapHeight,
   renderSettings
 ) => {
-  if (!game.isMultiplayer) return;
-
   const time = (performance.now() - game.virtualServer.startTime) / 1000;
-  const timeAlpha = Math.max(0, (time - 30) / 30) ** 3;
+  const timeAlpha = Math.min(1, Math.max(0, (time - 30) / 30) ** 3);
   if (timeAlpha >= 1) return;
 
   game.drawObjective(

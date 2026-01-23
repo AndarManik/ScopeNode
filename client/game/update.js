@@ -12,22 +12,49 @@ export const update = (game, app, delta, team1) => {
   if (game.previewingObstacle) return;
   if (game.choosingObstacle) return newObstaclePreview(game, app.socket);
 
+  if (!game.team1Lights) game.team1Lights = new Map();
+  if (!game.team2Lights) game.team2Lights = new Map();
+  if (!game.path) game.path = [];
+
+  if (game.isMultiPlayer) multiPlayerUpdate(game, app, delta, team1);
+  else singlePlayerUpdate(game, delta, team1);
+};
+
+const singlePlayerUpdate = (game, delta, team1) => {
+  game.path = [];
+  updatePlayerPosition(game, delta);
+  updatePlayerLight(game, team1);
+  updatePlayerAim(game, delta);
+
+  updateBotPositions(game, delta);
+
+  // we use the old teamLights to get new paths.
   game.team1Lights = new Map();
   game.team2Lights = new Map();
+  if (!game.lightGraph) return;
+};
+
+const updateBotPositions = (game, delta, team1) => {
+  for (const bot of game.bots) {
+  }
+};
+
+const multiPlayerUpdate = (game, app, delta, team1) => {
   game.path = [];
+  game.team1Lights = new Map();
+  game.team2Lights = new Map();
 
   if (!game.playerIsDead) updatePlayerPosition(game, delta);
-  updateGlobalPositions(game, delta);
-
-  if (game.lightGraph) {
-    if (!game.playerIsDead) updatePlayerLight(game, team1);
-    updateGlobalLights(game, team1);
-
-    if (!game.playerIsDead) updatePlayerAim(game, delta);
-    updateGlobalAim(game, team1, delta);
-  }
-
+  updateGlobalPositions(game, app, delta);
   updateShots(game, delta);
+
+  if (!game.lightGraph) return;
+
+  if (!game.playerIsDead) updatePlayerLight(game, team1);
+  updateGlobalLights(game, team1);
+
+  if (!game.playerIsDead) updatePlayerAim(game, delta);
+  updateGlobalAim(game, team1, delta);
 };
 
 const updatePlayerPosition = (game, delta) => {
@@ -75,16 +102,19 @@ const getWASDTarget = (game) => {
   return [px + (x * playerRadius) / 2, py + (y * playerRadius) / 2];
 };
 
-const updateGlobalPositions = (game, delta) => {
+const updateGlobalPositions = (game, app, delta) => {
+  let interps = 0;
   const { moveSpeed, playerRadius } = game;
   for (const state of game.virtualServer.globalStates.values()) {
-    // vServer sets seen to false when state is new
-    state.interp = state.seen;
-    state.seen = true;
-    if (!state.interp) return;
+    // vServer sets seen to 0 when state is new
+    state.seen++;
+    if (state.seen < 2) continue;
     const step = moveSpeed * playerRadius * delta;
     moveAlongPath(state.position, state.path, step);
+    interps++;
   }
+
+  app.stats.log.set("intrps", interps);
 };
 
 const updatePlayerLight = (game, team1) => {
@@ -96,9 +126,8 @@ const updatePlayerLight = (game, team1) => {
 
 const updateGlobalLights = (game, team1) => {
   for (const [uuid, state] of game.virtualServer.globalStates) {
-    const light = state.interp
-      ? game.lightGraph.shineAt(state.position)
-      : state.light;
+    const light =
+      state.seen > 1 ? game.lightGraph.shineAt(state.position) : state.light;
     light.push(state.position);
     if (team1.has(uuid)) game.team1Lights.set(uuid, light);
     else game.team2Lights.set(uuid, light);

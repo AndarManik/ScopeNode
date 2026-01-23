@@ -35,14 +35,14 @@ export const newVirtualServer = (game, app, team1, team2) => {
     const n = userHistory.length;
     if (n === 0) {
       Object.assign(globalStates.get(uuid), structuredClone(state));
-      globalStates.get(uuid).seen = false;
+      globalStates.get(uuid).seen = 0;
       userHistory.push(state);
       return;
     }
     const lastTick = userHistory[n - 1].tick[1];
     if (lastTick < tick) {
       Object.assign(globalStates.get(uuid), structuredClone(state));
-      globalStates.get(uuid).seen = false;
+      globalStates.get(uuid).seen = 0;
       userHistory.push(state);
       return;
     }
