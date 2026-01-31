@@ -298,7 +298,6 @@ const updateBotLights = (game, team1) => {
 };
 
 const updateSinglePlayerShots = (game, team1, delta) => {
-  return;
   const player = {
     uuid: "player",
     position: game.playerPosition,
