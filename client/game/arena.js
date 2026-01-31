@@ -16,7 +16,8 @@ export const initializeObstacles = (game, whenDone) => {
   const obstacleArea = game.obstacleArea;
 
   const pushTwo = () => {
-    const alpha = Math.sqrt((2 * count) / game.obstacleStartCount);
+    const prealpha = (2 * count) / game.obstacleStartCount
+    const alpha = prealpha;
     game.obstacleArea = alpha * obstacleArea + (1 - alpha) * 3;
 
     while (true) {
@@ -67,7 +68,6 @@ export const newObstaclePreview = (game, socket) => {
 
   if (game.mouse.isClicking && game.previewObstacle.index !== -1) {
     game.choosingObstacle = false;
-    game.forceDrop.forEach(clearTimeout);
     addObstacle(game, game.previewObstacle);
     return socket.json({
       command: "confirm obstacle",
@@ -147,7 +147,7 @@ export const addObstacle = (game, obstacle) => {
 
 const randomNormal = (a = Math.random(), b = Math.random()) =>
   Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b);
-const sampleNormal = (game, W = game.mapWidth, H = game.mapHeight, s = 0.5) => [
+const sampleNormal = (game, W = game.mapWidth, H = game.mapHeight, s = 2/3) => [
   Math.min(W, Math.max(0, W / 2 + randomNormal() * (W / 2) * s)),
   Math.min(H, Math.max(0, H / 2 + randomNormal() * (H / 2) * s)),
 ];

@@ -1,5 +1,5 @@
 import { packState, unpackState } from "./binary.js";
-import { registerHit } from "./hitreg.js";
+import { registerHit, registerTeamHits } from "./hitreg.js";
 
 export const newVirtualServer = (game, app, team1, team2) => {
   const { socket, stats } = app;
@@ -160,7 +160,6 @@ export const newVirtualServer = (game, app, team1, team2) => {
 
   let processedTick = 1;
   const processHistory = () => {
-    // Make sure each clients start tick is before or at proccessedTick
     if (
       !game.playerIsDead &&
       (!localHistory.length || localHistory[0].tick[0] > processedTick)
@@ -171,13 +170,16 @@ export const newVirtualServer = (game, app, team1, team2) => {
 
     if (!localHistory.length && !globalHistories.size) return false;
 
-    const tickSlice = game.playerIsDead ? [] : [[game.userId, localHistory[0]]];
+    const tickSlice = [];
+    if (!game.playerIsDead)
+      tickSlice.push({ ...localHistory[0], uuid: game.userId });
+
     for (const [uuid, history] of globalHistories.entries())
-      tickSlice.push([uuid, history[0]]);
+      tickSlice.push({ ...history[0], uuid });
 
     // Get the earliest end tick of each client
     let min = Number.MAX_SAFE_INTEGER;
-    for (const [_, state] of tickSlice) min = Math.min(state.tick[1], min);
+    for (const state of tickSlice) min = Math.min(state.tick[1], min);
 
     if (!game.playerIsDead && localHistory[0].tick[1] === min)
       localHistory.shift();
@@ -192,103 +194,32 @@ export const newVirtualServer = (game, app, team1, team2) => {
   };
 
   const processStates = (tickSlice, tick) => {
-    const team1States = tickSlice.filter(([uuid]) => team1.has(uuid));
-    const team2States = tickSlice.filter(([uuid]) => team2.has(uuid));
+    // tickSlice: array of states, each with .uuid
+    const team1States = tickSlice.filter((state) => team1.has(state.uuid));
+    const team2States = tickSlice.filter((state) => team2.has(state.uuid));
 
-    const newShots = [];
-    const playerRadius = game.playerRadius;
-    // team1 kills team2
-    for (const [uuid1, team1Player] of team1States) {
-      const losPoly = team1Player.light[0];
-      for (const [uuid2, team2Player] of team2States) {
-        const hit = registerHit(team2Player.position, playerRadius, losPoly);
-        if (!hit) continue;
-        newShots.push({
-          team1: true,
-          killer: uuid1,
-          killed: uuid2,
-          killerPosition: team1Player.position,
-          killedPosition: team2Player.position,
-          hit,
-        });
-      }
-    }
-    // team2 kills team1
-    for (const [uuid2, team2Player] of team2States) {
-      const losPoly = team2Player.light[0];
-      for (const [uuid1, team1Player] of team1States) {
-        const hit = registerHit(team1Player.position, playerRadius, losPoly);
-        if (!hit) continue;
-        newShots.push({
-          team2: true,
-          killer: uuid2,
-          killed: uuid1,
-          killerPosition: team2Player.position,
-          killedPosition: team1Player.position,
-          hit,
-        });
-      }
-    }
-
+    // deterministic in that all clients will get the same time here
+    // sum of monotonic functions is a monotonic function
     let time = 0;
-    for (const [_, state] of tickSlice) time += state.time;
+    for (const state of tickSlice) time += state.time;
     time /= tickSlice.length * 1000;
-    const timeAlpha = Math.max(0, (time - 30) / 30) ** 3;
 
-    const obstacleRadius =
-      (1 - timeAlpha) * playerRadius +
-      timeAlpha * Math.hypot(game.mapWidth, game.mapHeight);
+    const newShots = registerTeamHits(game, team1States, team2States, time);
+    if (!newShots.length) return;
 
-    for (const [uuid1, team1Player] of team1States) {
-      const dx = team1Player.position[0] - game.centerObjective[0];
-      const dy = team1Player.position[1] - game.centerObjective[1];
-      const dist = Math.sqrt(dx * dx + dy * dy) - playerRadius;
-      if (dist < obstacleRadius) {
-        for (const [uuid2, team2Player] of team2States) {
-          newShots.push({
-            team1: true,
-            killer: uuid1,
-            killed: uuid2,
-            killerPosition: team1Player.position,
-            killedPosition: team2Player.position,
-            hit: team2Player.position,
-          });
-        }
+    for (const shot of newShots) {
+      shots.add(shot);
+      if (shot.killed === game.userId) {
+        localHistory.length = 0;
+        game.playerIsDead = true;
+        return;
       }
+      globalStates.delete(shot.killed);
+      globalHistories.delete(shot.killed);
+      globalDead.add(shot.killed);
     }
 
-    for (const [uuid2, team2Player] of team2States) {
-      const dx = team2Player.position[0] - game.centerObjective[0];
-      const dy = team2Player.position[1] - game.centerObjective[1];
-      const dist = Math.sqrt(dx * dx + dy * dy) - playerRadius;
-      if (dist < obstacleRadius) {
-        for (const [uuid1, team1Player] of team1States) {
-          newShots.push({
-            team2: true,
-            killer: uuid2,
-            killed: uuid1,
-            killerPosition: team2Player.position,
-            killedPosition: team1Player.position,
-            hit: team1Player.position,
-          });
-        }
-      }
-    }
-
-    newShots.forEach(killPlayer);
-    if (newShots.length) socket.json({ command: "new shots", newShots, tick });
-  };
-
-  const killPlayer = (shot) => {
-    shots.add(shot);
-    if (shot.killed === game.userId) {
-      localHistory.length = 0;
-      game.playerIsDead = true;
-      return;
-    }
-    globalStates.delete(shot.killed);
-    globalHistories.delete(shot.killed);
-    globalDead.add(shot.killed);
+    socket.json({ command: "new shots", newShots, tick });
   };
 
   virtualServer.updatePlayers = (team1, team2) => {

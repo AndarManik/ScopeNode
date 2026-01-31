@@ -22,7 +22,7 @@ export const startEngine = (game, app, team1, team2) => {
   let stage = 0;
   let fpsThreshold = 0;
   const samplesMs = [];
-  const sampleCount = 25;
+  const sampleCount = 30;
   const BASE_SAMPLE_COUNT = sampleCount * 2;
   const WARMUP_SAMPLES = 10;
   let totalSamples = 0;

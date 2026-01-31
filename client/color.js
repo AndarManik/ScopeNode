@@ -4,7 +4,7 @@ export const newColor = (app) => {
   const color = {};
 
   color.hueMode = defaultGet("color.hueMode", "choice");
-  color.hue = defaultGet("color.hue", 90);
+  color.hue = defaultGet("color.hue", 220);
 
   if (color.hueMode === "random") color.hue = Math.floor(Math.random() * 360);
 
@@ -23,29 +23,29 @@ export const newColor = (app) => {
     color.background = `oklch(0.25 0.005 ${hue})`;
     color.backgroundBrilliant = `oklch(0.15 0.015 ${hue})`;
 
-    color.team1Player = `oklch(0.85 0.075 ${hue + 72})`;
-    color.team2Player = `oklch(0.85 0.075 ${hue - 72})`;
+    color.team1Player = `oklch(0.85 0.075 ${hue - 72})`;
+    color.team2Player = `oklch(0.85 0.075 ${hue + 72})`;
     color.centerObjective = `oklch(0.85 0.075 ${hue})`;
 
-    color.team1Path = `oklch(0.90 0.040 ${hue + 72})`;
-    color.team2Path = `oklch(0.90 0.040 ${hue - 72})`;
+    color.team1Path = `oklch(0.90 0.040 ${hue - 72})`;
+    color.team2Path = `oklch(0.90 0.040 ${hue + 72})`;
 
-    color.team1Point = `oklch(0.35 0.025 ${hue + 45})`;
-    color.team2Point = `oklch(0.35 0.025 ${hue - 45})`;
+    color.team1Point = `oklch(0.35 0.025 ${hue - 45})`;
+    color.team2Point = `oklch(0.35 0.025 ${hue + 45})`;
 
-    color.intersectPoint1 = `oklch(0.55 0.045 ${hue - 60})`;
-    color.intersectPoint2 = `oklch(0.55 0.045 ${hue + 60})`;
+    color.intersectPoint1 = `oklch(0.55 0.045 ${hue + 60})`;
+    color.intersectPoint2 = `oklch(0.55 0.045 ${hue - 60})`;
 
-    color.team1Disk = `oklch(0.75 0.125 ${hue + 72})`;
-    color.team2Disk = `oklch(0.75 0.125 ${hue - 72})`;
+    color.team1Disk = `oklch(0.75 0.125 ${hue - 72})`;
+    color.team2Disk = `oklch(0.75 0.125 ${hue + 72})`;
     color.objectiveDisk = `oklch(0.75 0.125 ${hue})`;
     color.intersectDisk = `oklch(0.86 0.065 ${hue})`;
 
-    color.team1Bullet = `oklch(0.90 0.045 ${hue + 72})`;
-    color.team2Bullet = `oklch(0.90 0.045 ${hue - 72})`;
+    color.team1Bullet = `oklch(0.90 0.045 ${hue - 72})`;
+    color.team2Bullet = `oklch(0.90 0.045 ${hue + 72})`;
 
-    color.team1Gun = `oklch(0.60 0.100 ${hue + 45})`;
-    color.team2Gun = `oklch(0.60 0.100 ${hue - 45})`;
+    color.team1Gun = `oklch(0.60 0.100 ${hue - 45})`;
+    color.team2Gun = `oklch(0.60 0.100 ${hue + 45})`;
   };
 
   color.setUIByHue = () => {
@@ -54,16 +54,16 @@ export const newColor = (app) => {
 
     color.transDark = `oklch(0.15 0.015 ${hue} / 0.25)`;
     color.input = `oklch(0.75 0.08 ${hue})`;
-    color.inputLeft = `oklch(0.75 0.08 ${hue + 45})`;
-    color.inputRight = `oklch(0.75 0.08 ${hue - 45})`;
+    color.inputLeft = `oklch(0.75 0.08 ${hue - 45})`;
+    color.inputRight = `oklch(0.75 0.08 ${hue + 45})`;
 
     color.inputOff = `oklch(0.55 0.050 ${hue})`;
-    color.inputLeftOff = `oklch(0.55 0.050 ${hue + 45})`;
-    color.inputRightOff = `oklch(0.55 0.050 ${hue - 45})`;
+    color.inputLeftOff = `oklch(0.55 0.050 ${hue - 45})`;
+    color.inputRightOff = `oklch(0.55 0.050 ${hue + 45})`;
 
     color.light = `oklch(0.90 0.045 ${hue})`;
-    color.lightLeft = `oklch(0.90 0.045 ${hue + 45})`;
-    color.lightRight = `oklch(0.90 0.045 ${hue - 45})`;
+    color.lightLeft = `oklch(0.90 0.045 ${hue - 45})`;
+    color.lightRight = `oklch(0.90 0.045 ${hue + 45})`;
 
     updateCSS();
   };
@@ -97,7 +97,7 @@ export const newColor = (app) => {
 
   color.obstacleColorBrilliant = (i) => {
     if (i === -1) {
-      return `oklch(0.40 0 ${color.hue})`;
+      return `oklch(0.60 0 ${color.hue})`;
     }
 
     const { obstacleHueRange, hue } = color;

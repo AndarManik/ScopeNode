@@ -16,7 +16,7 @@ export const generateObstacle = (
   const triangle = spawnTriangleCentered(alpha, area, minObstacleDeg);
   const poly = transformPoints(position, angle, triangle);
   const pathPoly = minkowskiSum(poly, playerRadius, minkowskiDeg);
-  const previewPoly = minkowskiSum(poly, 2 * playerRadius, minkowskiDeg / 4);
+  const previewPoly = minkowskiSum(poly, 2 * playerRadius, minkowskiDeg / 8);
   return { poly, pathPoly, previewPoly, position, angle, alpha };
 };
 

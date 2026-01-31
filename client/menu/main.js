@@ -1,5 +1,4 @@
 import { jiggleApp } from "../screentransform.js";
-import { join } from "./join.js";
 
 export const main = (app) => {
   const { menu, socket } = app;
@@ -23,21 +22,40 @@ export const main = (app) => {
   const info = menu.newEl(16, 12, 1, 1, "button");
   info.innerText = "?";
   info.style.background = "var(--light)";
+
   info.addEventListener("click", () => {
     menu.deleteEl(info);
-    const expand = menu.newEl(4, 9, 10, 2, "button");
-    expand.innerText = `You do NOT shoot manually.
-Standing in bright regions of your color kill instantly.
-Standing in bright regions of the other color kill YOU.
-Touch the center orb to win the round instantly.
-`;
-    expand.style.textAlign = "left";
-    expand.style.background = "var(--light)";
 
-    expand.addEventListener("click", () => {
-      menu.deleteEl(expand);
+    const lines = [
+      "Your node will automatically shoot what it sees.",
+      "Seek your team color and avoid the enemy color.",
+      "Touch the center orb to win the round instantly.",
+    ];
+
+    const baseX = 4;
+    const baseY = 9;
+    const width = 10;
+
+    const expands = [];
+    let idx = 0;
+
+    const collapse = () => {
+      for (const el of expands) menu.deleteEl(el);
       menu.renewEl(info);
-    });
+    };
+
+    const revealNext = () => {
+      if (idx >= lines.length) return collapse();
+      const el = menu.newEl(baseX, baseY + idx, width, 1, "button");
+      el.innerText = lines[idx];
+      el.style.textAlign = "left";
+      el.style.background = "var(--light)";
+      el.addEventListener("click", revealNext);
+      expands.push(el);
+      idx++;
+    };
+
+    revealNext();
   });
 
   const v = menu.newEl(1, 12, 1, 1);

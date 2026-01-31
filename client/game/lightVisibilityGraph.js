@@ -3,200 +3,9 @@
 const TAU = Math.PI * 2;
 
 const wrapToPi = (x) => ((((x + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
-const dist2 = (a, b) => {
-  const dx = a[0] - b[0],
-    dy = a[1] - b[1];
-  return dx * dx + dy * dy;
-};
-
-function dedupeConsecutiveEps(ring, eps = 1e-9) {
-  const out = [];
-  const closedIn = isClosed(ring);
-  const core = closedIn ? ring.slice(0, -1) : ring;
-  for (let i = 0; i < core.length; i++) {
-    const p = core[i];
-    const prev = out.length ? out[out.length - 1] : null;
-    if (!prev || dist2(prev, p) > eps * eps) out.push(p);
-  }
-  if (closedIn && out.length) {
-    if (dist2(out[0], out[out.length - 1]) > eps * eps) out.push(out[0]);
-    else out[out.length - 1] = out[0]; // unify endpoint exactly
-  }
-  return out;
-}
-
-function removeShortEdges(ring, edgeEps = 1e-6) {
-  if (!ring || ring.length < 4) return ring;
-  const closedIn = isClosed(ring);
-  const core = closedIn ? ring.slice(0, -1) : ring;
-  const out = [];
-  for (let i = 0; i < core.length; i++) {
-    const a = core[i];
-    const b = core[(i + 1) % core.length];
-    if (dist2(a, b) >= edgeEps * edgeEps) out.push(a);
-  }
-  if (closedIn && out.length) out.push(out[0]);
-  return out;
-}
-
-function removeABA(ring, eps = 1e-9) {
-  if (!ring || ring.length < 4) return ring;
-  const closedIn = isClosed(ring);
-  const core = closedIn ? ring.slice(0, -1) : ring;
-  const out = [];
-  const n = core.length;
-  for (let i = 0; i < n; i++) {
-    const a = core[(i - 1 + n) % n],
-      b = core[i],
-      c = core[(i + 1) % n];
-    // if a≈c, drop b
-    if (dist2(a, c) <= eps * eps) continue;
-    out.push(b);
-  }
-  if (closedIn && out.length) out.push(out[0]);
-  return out;
-}
-
-const signedArea = (ring) => {
-  let a = 0;
-  for (let i = 0, n = ring.length, j = n - 1; i < n; j = i++) {
-    const [x0, y0] = ring[j];
-    const [x1, y1] = ring[i];
-    a += x0 * y1 - x1 * y0;
-  }
-  return 0.5 * a;
-};
-
-const isClosed = (ring) => {
-  if (!ring || ring.length < 3) return false;
-  const [x0, y0] = ring[0];
-  const [xn, yn] = ring[ring.length - 1];
-  return x0 === xn && y0 === yn;
-};
-
-const closeRing = (ring) => (isClosed(ring) ? ring : [...ring, ring[0]]);
-
-const dedupeConsecutive = (ring) => {
-  const out = [];
-  for (let i = 0; i < ring.length; i++) {
-    const p = ring[i];
-    const q = ring[(i + 1) % ring.length];
-    if (p[0] !== q[0] || p[1] !== q[1]) out.push(p);
-  }
-  if (isClosed(ring) && !isClosed(out) && out.length) out.push(out[0]);
-  return out;
-};
-
-const removeNearlyCollinear = (ring, eps = 1e-8) => {
-  if (ring.length < 4) return ring;
-  const closed = isClosed(ring);
-  const core = closed ? ring.slice(0, -1) : ring;
-  const out = [];
-  const n = core.length;
-  for (let i = 0; i < n; i++) {
-    const a = core[(i - 1 + n) % n];
-    const b = core[i];
-    const c = core[(i + 1) % n];
-    const ux = b[0] - a[0],
-      uy = b[1] - a[1];
-    const vx = c[0] - b[0],
-      vy = c[1] - b[1];
-    const cross = ux * vy - uy * vx;
-    const lenU = Math.hypot(ux, uy);
-    const lenV = Math.hypot(vx, vy);
-    // keep b if not nearly collinear
-    if (Math.abs(cross) > eps * (lenU + lenV)) out.push(b);
-  }
-  if (closed && out.length) out.push(out[0]);
-  return out;
-};
-
-const ensureCCW = (ring) => (signedArea(ring) < 0 ? [...ring].reverse() : ring);
-
-// Snap to a small grid to stabilize set-ops
-const quantizeRing = (ring, step = 0.02) => {
-  const inv = 1 / step;
-  const out = ring.map(([x, y]) => [
-    Math.round(x * inv) / inv,
-    Math.round(y * inv) / inv,
-  ]);
-  return dedupeConsecutive(out);
-};
-
-const filterTiny = (ring, minArea = 0.25) =>
-  Math.abs(signedArea(ring)) >= minArea ? ring : null;
-
-const finalizeOuterRing = (
-  ring,
-  {
-    step = 0.02,
-    collinearEps = 1e-8,
-    dedupeEps = 1e-9,
-    edgeEps = 1e-6,
-    minArea = 0.25,
-  } = {}
-) => {
-  if (!ring || ring.length < 3) return null;
-
-  let r = ring.filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
-  if (r.length < 3) return null;
-
-  // 1) quantize early, then re-close/re-dedupe with eps
-  r = quantizeRing(r, step); // snaps + strict dedupe
-  r = closeRing(r); // ensure explicit closure
-  r = dedupeConsecutiveEps(r, dedupeEps);
-
-  // 2) kill micro-edges and spikes
-  r = removeShortEdges(r, edgeEps);
-  r = removeABA(r, dedupeEps);
-
-  // 3) remove near-collinear
-  r = removeNearlyCollinear(r, collinearEps);
-
-  // 4) post-pass: re-close & eps-dedupe (snapping can create new coincidences)
-  r = closeRing(r);
-  r = dedupeConsecutiveEps(r, dedupeEps);
-
-  if (r.length < 4) return null;
-
-  // 5) orientation & area floor
-  r = ensureCCW(r);
-  r = filterTiny(r, minArea);
-  return r;
-};
-
-const ensureCW = (ring) => (signedArea(ring) > 0 ? [...ring].reverse() : ring);
-
-const finalizeInnerRing = (ring, opts) => {
-  const r = finalizeOuterRing(ring, opts);
-  return r ? ensureCW(r) : null;
-};
-
-export function cleanMultiPolygon(mpoly, opts) {
-  if (!mpoly) return null;
-  const out = [];
-  for (const poly of mpoly) {
-    const rings = [];
-    for (let idx = 0; idx < poly.length; idx++) {
-      const ring = poly[idx];
-      const cleaned =
-        idx === 0
-          ? finalizeOuterRing(ring, opts)
-          : finalizeInnerRing(ring, opts);
-      if (cleaned) rings.push(cleaned);
-    }
-    if (rings.length) out.push(rings);
-  }
-  return out.length ? out : null;
-}
 
 const deltaOrient = ([x1, y1], [x2, y2], [x3, y3]) =>
   Math.sign((y2 - y1) * x3 - (x2 - x1) * y3);
-const wrapAngle = (θ) => {
-  if (θ <= -Math.PI) θ += TAU;
-  if (θ > Math.PI) θ -= TAU;
-  return θ;
-};
 const cross = (ax, ay, bx, by) => ax * by - ay * bx;
 const dot = (ax, ay, bx, by) => ax * bx + ay * by;
 
@@ -225,6 +34,7 @@ export class LightGraph {
     this._polygons = []; // internal: [{indices:[...], points:[[x,y],...], bbox:{minX,maxX,minY,maxY}, id:number}]
     this._EPS = eps;
     this._occluded = new Uint8Array(0); // length mirrors this.vertices.length
+    this._seenEdge = new Set();
 
     // ---- spatial hash over polygon boundary edges ----
     this._cellSize = cellSize;
@@ -552,126 +362,53 @@ export class LightGraph {
     return { poly, cascade };
   }
 
-  oldShineAt(pos) {
-    const visible = this.visibleIndicesAt(pos).map((index) => {
-      const vertex = this.vertices[index];
-      const delta = [vertex[0] - pos[0], vertex[1] - pos[1]];
-      const angle = Math.atan2(delta[1], delta[0]);
-      const distance = Math.hypot(delta[0], delta[1]);
-      const { vPrev, vNext } = this._vertexCone[index];
+  pointPolyAt(pos, visibleIndices = null) {
+    const pointPoly = [];
+    if (!visibleIndices) visibleIndices = this.visibleIndicesAt(pos);
+    if (!visibleIndices.length) return [];
 
-      const prevOrient = deltaOrient(pos, vertex, vPrev);
-      const nextOrient = deltaOrient(pos, vertex, vNext);
-      const isCritical =
-        !prevOrient || !nextOrient || prevOrient === nextOrient;
-      const direction = Math.sign(prevOrient + nextOrient) || 1;
-      const criticality = isCritical ? direction : 0; // -1 = leaving, +1 = entering, 0 = regular
-      return { vertex, angle, criticality, distance, index };
+    const visible = visibleIndices.map((index) => {
+      const vertex = this.vertices[index];
+      const angle = Math.atan2(vertex[1] - pos[1], vertex[0] - pos[0]);
+      const { vPrev, vNext } = this._vertexCone[index];
+      const criticality = checkCriticality(pos, vPrev, vertex, vNext);
+      return { index, vertex, angle, criticality };
     });
 
-    if (!visible.length) return [];
-
+    // Sort by angle around pos
     visible.sort((a, b) => a.angle - b.angle);
 
-    const EPS = 1e-6;
-    const MAX_STEP = Math.PI;
-    const pointShinePoly = [];
-    const diskShinePoly = [];
+    const MAX_STEP = Math.PI / 2;
+
     for (let i = 0; i < visible.length; i++) {
       const a = visible[i];
       const b = visible[(i + 1) % visible.length];
+
+      // Wrap the last-to-first transition
       if (i === visible.length - 1 && b.angle <= a.angle) b.angle += TAU;
 
-      this.firstOrderBleedAt(
-        a,
-        PLAYER_RADIUS,
-        pos,
-        pointShinePoly,
-        diskShinePoly
-      );
+      const { index, vertex, angle, criticality } = a;
 
+      // Handle critical vertices with extra rays
+      if (criticality === -1) pointPoly.push(this._vertexRaycast(index, angle));
+
+      pointPoly.push(vertex);
+
+      if (criticality === +1) pointPoly.push(this._vertexRaycast(index, angle));
+
+      // Fill in large angular gaps with a midpoint ray
       const delta = b.angle - a.angle;
-      const k = Math.floor(delta / MAX_STEP);
-      if (delta > MAX_STEP + EPS)
-        for (let j = 1; j <= k; j++) {
-          const v = this._raycast(pos, a.angle + (j * delta) / (k + 1));
-          pointShinePoly.push(v);
-          diskShinePoly.push(v);
-        }
-    }
-    return { pointShinePoly, diskShinePoly };
-  }
-
-  firstOrderBleedAt(visVertex, radius, pos, pointShinePoly, diskShinePoly) {
-    const { criticality, vertex, angle, distance, index } = visVertex;
-    if (!criticality) {
-      pointShinePoly.push(vertex);
-      diskShinePoly.push(vertex);
-      return;
-    }
-    const { aPrev, aNext } = this._vertexCone[index];
-    const EPS = 1e-6;
-
-    const prevAngleDist = minAngleDist(aPrev, angle);
-    const nextAngleDist = minAngleDist(aNext, angle);
-    // the minus eps works here by ignoring the bounding vertex, we instead need to force include that boundary vertex.
-    // this could work by checking if we hit the boundary we use that bounding vertex for the rayVertex
-    const maxBleedDelta = Math.min(prevAngleDist, nextAngleDist) + EPS;
-    const bleedDelta = Math.min(Math.asin(radius / distance), maxBleedDelta);
-    // [0, π/2)
-    const half = bleedDelta * 0.5;
-    // midpoint of the small arc between angle and bleedAngle
-    const mid = wrapToPi(angle - criticality * half);
-    // use shortest signed angular distance to mid
-    const edgeMeta = this.edgesMeta[index];
-    const relevantEdges = edgeMeta
-      .filter((a) => Math.abs(wrapToPi(a.angle - mid)) <= half + EPS)
-      .sort((a, b) => wrapToPi(a.angle - mid) - wrapToPi(b.angle - mid));
-
-    if (criticality === -1) {
-      const rayVertex = this._vertexRaycast(index, angle);
-      pointShinePoly.push(rayVertex);
-      diskShinePoly.push(rayVertex);
-      relevantEdges.forEach((edge) =>
-        this.secondOrderBleedAt(edge, diskShinePoly, pos, -1)
-      );
-      diskShinePoly.push(this._vertexRaycast(index, angle + bleedDelta));
-    }
-
-    diskShinePoly.push(vertex);
-    pointShinePoly.push(vertex);
-
-    if (criticality === +1) {
-      diskShinePoly.push(this._vertexRaycast(index, angle - bleedDelta));
-      relevantEdges.forEach((edge) =>
-        this.secondOrderBleedAt(edge, diskShinePoly, pos, 1)
-      );
-      const rayVertex = this._vertexRaycast(index, angle);
-      diskShinePoly.push(rayVertex);
-      pointShinePoly.push(rayVertex);
-    }
-  }
-
-  secondOrderBleedAt(edge, diskShinePoly, pos, rootCriticality) {
-    const { angle, index, criticality } = edge;
-
-    // no criticality means no need to pass through vertex
-    if (!criticality) {
-      diskShinePoly.push(this.vertices[index]);
-      return;
-    }
-
-    // criticality different so full side occlusion, need to pass through vertex
-    if (criticality !== rootCriticality || true) {
-      if (criticality === -1) {
-        diskShinePoly.push(this._vertexRaycast(index, angle));
-        diskShinePoly.push(this.vertices[index]);
-      } else {
-        diskShinePoly.push(this.vertices[index]);
-        diskShinePoly.push(this._vertexRaycast(index, angle));
+      if (delta > MAX_STEP) {
+        const midAngle = a.angle + delta / 2;
+        const v = this._raycast(pos, midAngle);
+        pointPoly.push(v);
       }
-      return;
     }
+
+    // Close the polygon if we actually have points
+    if (pointPoly.length) pointPoly.push(pointPoly[0]);
+
+    return pointPoly;
   }
 
   buildVertexVisibility(index, maxDist = 4e4) {
@@ -1338,39 +1075,6 @@ export class LightGraph {
   }
 
   /**
-   * Grid-accelerated visibility check for arbitrary source point → arbitrary source point.
-   */
-  _visibleFromPointToPoint(P, Q, eps = this._EPS) {
-    // 1) boundary crossings via spatial hash
-    const ignore = { A: new Set(), B: new Set() };
-
-    const crosses = this._segmentCrossesAnyBoundaryGrid(
-      P,
-      Q,
-      eps,
-      ignore,
-      null
-    );
-    if (crosses) return false;
-
-    // 2) interior test (midpoint inside any polygon?)
-    const mid = [(P[0] + Q[0]) * 0.5, (P[1] + Q[1]) * 0.5];
-    for (const poly of this._polygons) {
-      const bb = poly.bbox;
-      if (
-        mid[0] < bb.minX - eps ||
-        mid[0] > bb.maxX + eps ||
-        mid[1] < bb.minY - eps ||
-        mid[1] > bb.maxY + eps
-      ) {
-        continue;
-      }
-      if (this._pointInPolygonStrict(mid, poly.points, eps)) return false;
-    }
-    return true;
-  }
-
-  /**
    * Grid-accelerated visibility check for arbitrary source point → vertex j.
    */
   _visibleFromPointToVertex(P, j) {
@@ -1404,7 +1108,6 @@ export class LightGraph {
       A,
       B,
       eps,
-      ignore,
       skipPolyOwningEndpoints ? { i, j } : null
     );
     if (crosses) return false;
@@ -1426,39 +1129,49 @@ export class LightGraph {
     return true;
   }
 
-  _segmentCrossesAnyBoundaryGrid(A, B, eps, ignore, skipPolyOwnedBy = null) {
-    const seenEdge = new Set();
+  _segmentCrossesAnyBoundaryGrid(A, B, eps, skipPolyOwnedBy = null) {
+    const edgeGrid = this._edgeGrid;
+    const edgeStore = this._edgeStore;
+    const polyOwnsVertexIndex = this._polyOwnsVertexIndex.bind(this);
+    const ptEq = this._ptEq.bind(this);
+    const segSegIntersectKind = this._segSegIntersectKind.bind(this);
+
+    const seenEdge = this._seenEdge;
+    seenEdge.clear();
+
     let hit = false;
 
+    const useSkip = !!skipPolyOwnedBy;
+    const skipI = useSkip ? skipPolyOwnedBy.i : 0;
+    const skipJ = useSkip ? skipPolyOwnedBy.j : 0;
+
     this._walkGridCells(A, B, (key) => {
-      const bucket = this._edgeGrid.get(key);
+      const bucket = edgeGrid.get(key);
       if (!bucket) return false; // keep walking
+
       for (const edgeId of bucket) {
         if (seenEdge.has(edgeId)) continue;
         seenEdge.add(edgeId);
-        const ed = this._edgeStore.get(edgeId);
+
+        const ed = edgeStore.get(edgeId);
         if (!ed) continue;
 
-        // Optionally skip polygons owning either endpoint (for ring-side re-allow)
-        if (skipPolyOwnedBy) {
-          const { i, j } = skipPolyOwnedBy;
-          const ownsI = this._polyOwnsVertexIndex(ed.polyId, i);
-          const ownsJ = this._polyOwnsVertexIndex(ed.polyId, j);
+        if (useSkip) {
+          const ownsI = polyOwnsVertexIndex(ed.polyId, skipI);
+          const ownsJ = polyOwnsVertexIndex(ed.polyId, skipJ);
           if (ownsI || ownsJ) continue;
         }
 
-        // incident-slide heuristic: if edge touches exactly at A or B, let it pass
-        const touchesA = this._ptEq(A, ed.c, eps) || this._ptEq(A, ed.d, eps);
-        const touchesB = this._ptEq(B, ed.c, eps) || this._ptEq(B, ed.d, eps);
+        const touchesA = ptEq(A, ed.c, eps) || ptEq(A, ed.d, eps);
+        const touchesB = ptEq(B, ed.c, eps) || ptEq(B, ed.d, eps);
         if (touchesA || touchesB) continue;
 
-        const kind = this._segSegIntersectKind(A, B, ed.c, ed.d, eps);
+        const kind = segSegIntersectKind(A, B, ed.c, ed.d, eps);
         if (kind === "proper") {
           hit = true;
           return true;
         }
         if (kind === "endpoint" || kind === "overlap") {
-          // If the touch is not exactly at our own endpoint, treat as blocking.
           const touchingAtOwnEndpoint = touchesA || touchesB;
           if (!touchingAtOwnEndpoint) {
             hit = true;
@@ -1466,7 +1179,7 @@ export class LightGraph {
           }
         }
       }
-      return hit; // stop early if hit
+      return hit;
     });
 
     return hit;
@@ -1572,21 +1285,26 @@ export class LightGraph {
 
   _walkGridCells(a, b, visitCell /* (key) => stop? */) {
     const cs = this._cellSize;
-    // DDA traversal identical to rasterize, but calls visitCell
     let x0 = a[0],
-      y0 = a[1],
-      x1 = b[0],
+      y0 = a[1];
+    let x1 = b[0],
       y1 = b[1];
-    const dx = x1 - x0,
-      dy = y1 - y0;
+    const dx = x1 - x0;
+    const dy = y1 - y0;
 
-    let cx = this._cellOf(x0),
-      cy = this._cellOf(y0);
-    const cx1 = this._cellOf(x1),
-      cy1 = this._cellOf(y1);
+    let cx = this._cellOf(x0);
+    let cy = this._cellOf(y0);
+    const cx1 = this._cellOf(x1);
+    const cy1 = this._cellOf(y1);
 
     const stepX = dx > 0 ? 1 : dx < 0 ? -1 : 0;
     const stepY = dy > 0 ? 1 : dy < 0 ? -1 : 0;
+
+    // Single-cell segment: visit once and return.
+    if (cx === cx1 && cy === cy1) {
+      if (visitCell(this._cellKey(cx, cy)) === true) return;
+      return;
+    }
 
     const invDx = dx !== 0 ? 1 / dx : 0;
     const invDy = dy !== 0 ? 1 / dy : 0;
@@ -1605,9 +1323,11 @@ export class LightGraph {
     const tDeltaX = stepX !== 0 ? cs * stepX * invDx : Infinity;
     const tDeltaY = stepY !== 0 ? cs * stepY * invDy : Infinity;
 
-    const tryVisit = () => visitCell(this._cellKey(cx, cy)) === true;
+    const cellKeyFn = this._cellKey.bind(this);
 
-    if (tryVisit()) return;
+    // first cell
+    if (visitCell(cellKeyFn(cx, cy)) === true) return;
+
     const maxIter = 1e6;
     let iter = 0;
     while ((cx !== cx1 || cy !== cy1) && iter++ < maxIter) {
@@ -1618,7 +1338,7 @@ export class LightGraph {
         cy += stepY;
         tMaxY += Math.abs(tDeltaY);
       }
-      if (tryVisit()) return;
+      if (visitCell(cellKeyFn(cx, cy)) === true) return;
     }
   }
 

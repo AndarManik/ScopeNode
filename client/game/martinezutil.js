@@ -1,3 +1,5 @@
+import "./martinez.min.js";
+
 export const toMulti = (polygon) => [[[...polygon, polygon[0]]]];
 
 // skip first cause we use it as the init val reduce

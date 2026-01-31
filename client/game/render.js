@@ -1,5 +1,6 @@
 import { createBulletWarpPostFX } from "./bulletwarp.js";
 import { createTeamsVisionRenderer } from "./lightrendering.js";
+import { filletPolyline } from "./pathsmoothing.js";
 import { createPlayerRenderer } from "./playerrendering.js";
 import { animateShot } from "./shootanimation.js";
 
@@ -29,18 +30,64 @@ export const render = (game, team1, team2) => {
   renderMouseDot(ctx, game, isTeam1, color, playerRadius);
 
   if (game.isMultiPlayer) multiPlayerRender(game, ctx, team1, isTeam1);
-  else singlePlayerRender(game, ctx, isTeam1);
+  else singlePlayerRender(game, ctx, team1, isTeam1);
 };
 
-const singlePlayerRender = (game, ctx, isTeam1) => {
-  const { color, playerRadius } = game;
-  renderPlayerPath(ctx, game, isTeam1, color, playerRadius);
-  renderLocalPlayer(game, isTeam1);
-  renderBots(game);
-  game.warpFX.render({ xSwap: game.xSwap });
+const singlePlayerRender = (game, ctx, team1, isTeam1) => {
+  const { color, playerRadius, mapWidth, mapHeight, renderSettings } = game;
+  if (!game.playerIsDead) {
+    renderPlayerPath(ctx, game, isTeam1, color, playerRadius);
+    renderLocalPlayer(game, isTeam1);
+  }
+  renderBots(game, team1);
+
+  renderObjectiveIfNeeded(
+    game,
+    color,
+    playerRadius,
+    mapWidth,
+    mapHeight,
+    renderSettings,
+  );
+
+  renderShotsAndWarp(game, ctx, game.shots, playerRadius);
 };
 
-const renderBots = (game) => {};
+const renderBots = (game, team1) => {
+  const { color, playerRadius, renderSettings } = game;
+
+  for (const state of game.bots) {
+    const uuid = state.uuid;
+    const isTeam1 = team1.has(uuid);
+
+    const target = state.target?.[0];
+    const hasAdvantage = state.target?.[1];
+
+    const playerColor = isTeam1 ? color.team1Player : color.team2Player;
+    const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
+    const gunColorSwapped = isTeam1 ? color.team2Gun : color.team1Gun;
+    const gunColor = !hasAdvantage ? gunColorSwapped : gunColorNormal;
+
+    const glowColorNormal = isTeam1 ? color.team1Disk : color.team2Disk;
+    const glowColorSwapped = isTeam1 ? color.team2Disk : color.team1Disk;
+    const glowColor = !hasAdvantage ? glowColorSwapped : glowColorNormal;
+
+    game.drawPlayer(
+      state.position,
+      playerRadius,
+      playerColor,
+      gunColor,
+      target,
+      renderSettings.glowEnabled
+        ? {
+            glowRadius: playerRadius / 1.25,
+            glowColor: glowColor,
+            composite: "color-dodge",
+          }
+        : null,
+    );
+  }
+};
 
 const multiPlayerRender = (game, ctx, team1, isTeam1) => {
   const { renderSettings, color, mapWidth, mapHeight, playerRadius } = game;
@@ -56,10 +103,10 @@ const multiPlayerRender = (game, ctx, team1, isTeam1) => {
     playerRadius,
     mapWidth,
     mapHeight,
-    renderSettings
+    renderSettings,
   );
 
-  renderShotsAndWarp(game, ctx, playerRadius);
+  renderShotsAndWarp(game, ctx, game.virtualServer.shots, playerRadius);
 };
 
 const applyXSwap = (game, team1, team2, isTeam1) => {
@@ -85,12 +132,12 @@ const ensureSceneCanvases = (game, renderSettings, mapWidth, mapHeight) => {
     game.sceneCtx,
     mapWidth,
     mapHeight,
-    game.scale
+    game.scale,
   );
 
   Object.assign(
     game,
-    createPlayerRenderer(game.sceneCtx, mapWidth, mapHeight, game.scale)
+    createPlayerRenderer(game.sceneCtx, mapWidth, mapHeight, game.scale),
   );
 };
 
@@ -109,7 +156,7 @@ const renderTeamLights = (game, color, renderSettings) => {
     [...game.team1Lights.values()],
     [...game.team2Lights.values()],
     color,
-    renderSettings.glowEnabled
+    renderSettings.glowEnabled,
   );
 };
 
@@ -119,6 +166,21 @@ const renderMouseDot = (ctx, game, isTeam1, color, playerRadius) => {
   ctx.arc(game.mouse[0], game.mouse[1], playerRadius / 5, 0, Math.PI * 2);
   ctx.fill();
 };
+
+
+function strokeFilletedPath(ctx, points, R) {
+  const fp = filletPolyline(points, R);
+  if (!fp || fp.segs.length === 0) return;
+
+  ctx.beginPath();
+  ctx.moveTo(fp.start[0], fp.start[1]);
+
+  for (const s of fp.segs)
+    if (s.type === "line") ctx.lineTo(s.to[0], s.to[1]);
+    else ctx.arc(s.c[0], s.c[1], s.r, s.a0, s.a1, !s.ccw);
+
+  ctx.stroke();
+}
 
 const renderPlayerPath = (ctx, game, isTeam1, color, playerRadius) => {
   if (game.path.length <= 0) return;
@@ -143,8 +205,7 @@ const renderPlayerPath = (ctx, game, isTeam1, color, playerRadius) => {
 
   // path
   ctx.beginPath();
-  game.path.forEach((v) => ctx.lineTo(v[0], v[1]));
-  ctx.stroke();
+  strokeFilletedPath(ctx, game.path, playerRadius);
 
   // final position
   const last = game.path[game.path.length - 1];
@@ -208,9 +269,9 @@ const renderLocalPlayer = (game, isTeam1) => {
       ? {
           glowRadius: playerRadius / 1.25,
           glowColor: glowColor,
-          composite: "hard-light",
+          composite: "color-dodge",
         }
-      : null
+      : null,
   );
 };
 
@@ -242,9 +303,9 @@ const renderGlobalPlayers = (game, team1) => {
         ? {
             glowRadius: playerRadius / 1.25,
             glowColor: glowColor,
-            composite: "hard-light",
+            composite: "color-dodge",
           }
-        : null
+        : null,
     );
   }
 };
@@ -255,9 +316,12 @@ const renderObjectiveIfNeeded = (
   playerRadius,
   mapWidth,
   mapHeight,
-  renderSettings
+  renderSettings,
 ) => {
-  const time = (performance.now() - game.virtualServer.startTime) / 1000;
+  const startTime = game.isMultiPlayer
+    ? game.virtualServer.startTime
+    : game.startTime;
+  const time = (performance.now() - startTime) / 1000;
   const timeAlpha = Math.min(1, Math.max(0, (time - 30) / 30) ** 3);
   if (timeAlpha >= 1) return;
 
@@ -272,17 +336,17 @@ const renderObjectiveIfNeeded = (
       ? {
           glowRadius: playerRadius / 1.25,
           glowColor: color.objectiveDisk,
-          composite: "hard-light",
+          composite: "color-dodge",
         }
-      : null
+      : null,
   );
 };
 
-const renderShotsAndWarp = (game, ctx, playerRadius) => {
+const renderShotsAndWarp = (game, ctx, shots, playerRadius) => {
   const s = game.scale;
   const bullets = [];
 
-  for (const shot of game.virtualServer.shots) {
+  for (const shot of shots) {
     const bullet = animateShot(game, ctx, shot, s);
     if (bullet) bullets.push(bullet[1]);
   }
@@ -300,12 +364,16 @@ const renderObstaclePreviewScene = (
   ctx,
   color,
   renderSettings,
-  playerRadius
+  playerRadius,
 ) => {
   const { poly, previewPoly } = game.previewObstacle;
 
   // main preview obstacle
-  ctx.fillStyle = color.obstacleColorBrilliant(game.previewObstacle.index);
+
+  if (!renderSettings.glowEnabled || game.previewObstacle.index === -1)
+    ctx.fillStyle = color.obstacleColorBrilliant(game.previewObstacle.index);
+  else ctx.fillStyle = color.background;
+
   ctx.beginPath();
   ctx.moveTo(poly[0][0], poly[0][1]);
   for (let k = 1; k < poly.length; k++) ctx.lineTo(poly[k][0], poly[k][1]);
@@ -320,9 +388,11 @@ const renderObstaclePreviewScene = (
   }
 
   // blockers
-  drawObstacleBlockers(game, ctx, color, playerRadius);
+  drawObstacleBlockers(game, ctx, color);
 
   // ghost preview poly
+  if (renderSettings.glowEnabled && game.previewObstacle.index !== -1)
+    ctx.fillStyle = color.obstacleColorBrilliant(-1);
   ctx.save();
   ctx.globalAlpha = 0.5;
   ctx.beginPath();
@@ -334,8 +404,8 @@ const renderObstaclePreviewScene = (
   ctx.restore();
 
   // spawns + center objective + freeze-frame shots
-  drawPreviewSpawnsAndObjective(game, ctx, color, renderSettings, playerRadius);
-  drawPreviewShots(game, ctx, color, renderSettings, playerRadius);
+  drawPreviewSpawnsAndObjective(game, ctx, color, renderSettings);
+  if (game.isMultiPlayer) drawPreviewShots(game, ctx, color, renderSettings);
 
   // warpFX with no bullets
   game.warpFX.render({
@@ -344,9 +414,9 @@ const renderObstaclePreviewScene = (
   });
 };
 
-const drawObstacleBlockers = (game, ctx, color, playerRadius) => {
+const drawObstacleBlockers = (game, ctx, color) => {
   ctx.strokeStyle = color.backgroundBrilliant;
-  ctx.lineWidth = 2 * playerRadius;
+  ctx.lineWidth = 2 * game.playerRadius;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
@@ -360,13 +430,8 @@ const drawObstacleBlockers = (game, ctx, color, playerRadius) => {
   });
 };
 
-const drawPreviewSpawnsAndObjective = (
-  game,
-  ctx,
-  color,
-  renderSettings,
-  playerRadius
-) => {
+const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
+  const playerRadius = game.playerRadius;
   // spawn1
   game.drawPlayer(
     game.spawn1,
@@ -375,15 +440,15 @@ const drawPreviewSpawnsAndObjective = (
     color.team1Gun,
     Math.atan2(
       game.spawn2[1] - game.spawn1[1],
-      game.spawn2[0] - game.spawn1[0]
+      game.spawn2[0] - game.spawn1[0],
     ),
     renderSettings.glowEnabled
       ? {
           glowRadius: playerRadius / 1.25,
           glowColor: color.team1Disk,
-          composite: "hard-light",
+          composite: "color-dodge",
         }
-      : null
+      : null,
   );
 
   // center objective
@@ -400,19 +465,20 @@ const drawPreviewSpawnsAndObjective = (
     color.team2Gun,
     Math.atan2(
       game.spawn1[1] - game.spawn2[1],
-      game.spawn1[0] - game.spawn2[0]
+      game.spawn1[0] - game.spawn2[0],
     ),
     renderSettings.glowEnabled
       ? {
           glowRadius: playerRadius / 1.25,
           glowColor: color.team2Disk,
-          composite: "hard-light",
+          composite: "color-dodge",
         }
-      : null
+      : null,
   );
 };
 
-const drawPreviewShots = (game, ctx, color, renderSettings, playerRadius) => {
+const drawPreviewShots = (game, ctx, color, renderSettings) => {
+  const playerRadius = game.playerRadius;
   game.virtualServer.shots.forEach(
     ({ team1, killerPosition, killedPosition, hit }) => {
       // killer
@@ -422,7 +488,7 @@ const drawPreviewShots = (game, ctx, color, renderSettings, playerRadius) => {
 
       const killerAngle = Math.atan2(
         hit[1] - killerPosition[1],
-        hit[0] - killerPosition[0]
+        hit[0] - killerPosition[0],
       );
 
       game.drawPlayer(
@@ -435,9 +501,9 @@ const drawPreviewShots = (game, ctx, color, renderSettings, playerRadius) => {
           ? {
               glowRadius: playerRadius / 1.25,
               glowColor: killerGlowColor,
-              composite: "hard-light",
+              composite: "color-dodge",
             }
-          : null
+          : null,
       );
 
       // killed
@@ -447,7 +513,7 @@ const drawPreviewShots = (game, ctx, color, renderSettings, playerRadius) => {
 
       const killedAngle = Math.atan2(
         killerPosition[1] - killedPosition[1],
-        killerPosition[0] - killedPosition[0]
+        killerPosition[0] - killedPosition[0],
       );
 
       game.drawPlayer(
@@ -460,9 +526,9 @@ const drawPreviewShots = (game, ctx, color, renderSettings, playerRadius) => {
           ? {
               glowRadius: playerRadius / 1.25,
               glowColor: killedGlowColor,
-              composite: "hard-light",
+              composite: "color-dodge",
             }
-          : null
+          : null,
       );
 
       // line
@@ -473,7 +539,7 @@ const drawPreviewShots = (game, ctx, color, renderSettings, playerRadius) => {
       ctx.moveTo(...killerPosition);
       ctx.lineTo(...hit);
       ctx.stroke();
-    }
+    },
   );
 };
 
@@ -508,14 +574,18 @@ const newGameCanvases = (game, scale, mapWidth, mapHeight) => {
 };
 
 const drawObstacles = (game, ctx, color) => {
-  let colorIndex = 0;
   if (!game.obstacleRenderGroups) return;
 
+  let colorIndex = 0;
+
   for (const group of game.obstacleRenderGroups) {
-    ctx.fillStyle =
-      game.choosingObstacle || game.previewingObstacle
-        ? color.obstacleColorBrilliant(colorIndex++)
-        : color.obstacleColor(colorIndex++);
+    if (!game.renderSettings.glowEnabled)
+      ctx.fillStyle =
+        game.choosingObstacle || game.previewingObstacle
+          ? color.obstacleColorBrilliant(colorIndex++)
+          : color.obstacleColor(colorIndex++);
+    else ctx.fillStyle = color.background;
+
     ctx.beginPath();
 
     for (const poly of group) {

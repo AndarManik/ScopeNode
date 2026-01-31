@@ -32,10 +32,9 @@ export const newGame = (app, options, team1, team2) => {
   game.centerObjective = [game.mapWidth / 2, game.mapHeight / 2];
 
   if (!game.isMultiPlayer) {
-    team1 = new Set(["player"]);
-    team2 = new Set(["opponent"]);
+    team1 = new Set(["player", "t1"]);
+    team2 = new Set(["o1"]);
     game.bots = [];
-    game.bots.push({ uuid: "opponent", position: [...game.spawn2] });
   }
 
   game.previewAlpha = 0;
@@ -44,14 +43,39 @@ export const newGame = (app, options, team1, team2) => {
   game.mouse = newMouse(game, app.menu);
   game.keyboard = newKeyBoard(game, app.menu);
 
-  const init = () => {
+  game.init = () => {
     game.playerIsDead = false || game.isSpec;
     game.playerPosition = game.isTeam1 ? [...game.spawn1] : [...game.spawn2];
     game.path = [];
     game.playerLight = [[], []];
+    game.team1Lights = new Map();
+    game.team2Lights = new Map();
+
+    if (game.isMultiPlayer) return;
+    //game.playerIsDead = true;
+    game.bots.length = 0;
+
+    for (const uuid of team1)
+      if (uuid !== "player")
+        game.bots.push({
+          uuid,
+          position: [...game.spawn1],
+        });
+
+    for (const uuid of team2)
+      game.bots.push({
+        uuid,
+        position: [...game.spawn2],
+      });
+
+    game.startTime = performance.now();
+    game.shots = new Set();
+
+    game.buildingObstacles = true;
+    initializeObstacles(game, () => (game.buildingObstacles = false));
   };
 
-  init();
+  game.init();
 
   startEngine(game, app, team1, team2);
 
@@ -61,7 +85,7 @@ export const newGame = (app, options, team1, team2) => {
         app.socket.json({
           command: "obstacles",
           obstacles: [game.obstacles, game.obstacleBlockers],
-        })
+        }),
       );
     };
 
@@ -72,7 +96,7 @@ export const newGame = (app, options, team1, team2) => {
 
     game.startVirtualServer = () => {
       game.preRound = true;
-      init();
+      game.init();
       game.virtualServer = newVirtualServer(game, app, team1, team2);
       game.virtualServer.start();
       app.socket.json({ command: "virtual server started" });
@@ -109,8 +133,8 @@ export const newGame = (app, options, team1, team2) => {
           winner === "draw"
             ? "ROUND DRAW"
             : winner === teamString
-            ? "ROUND WON"
-            : "ROUND LOST";
+              ? "ROUND WON"
+              : "ROUND LOST";
         hugeText.innerText = `${score.join(" - ")}\n${resultText}`;
 
         setTimeout(fadeOutRoundText, 3000);
@@ -134,22 +158,25 @@ export const newGame = (app, options, team1, team2) => {
       const total = 20000;
       const countdowns = [10, 5, 3, 2, 1];
       game.forceDrop = countdowns.map((secLeft) =>
-        setTimeout(() => {
-          // Show the number
-          if (!game.choosingObstacle) return;
-          hugeText.classList.remove("fading-out");
-          hugeText.style.opacity = 0.9;
-          hugeText.style.fontSize = "512px";
-          hugeText.innerText = secLeft;
-          setTimeout(() => {
-            hugeText.classList.add("fading-out");
-            hugeText.style.opacity = 0;
-          }, 250);
-        }, total - secLeft * 1000)
+        setTimeout(
+          () => {
+            // Show the number
+            if (!game.choosingObstacle) return;
+            hugeText.classList.remove("fading-out");
+            hugeText.style.opacity = 0.9;
+            hugeText.style.fontSize = "512px";
+            hugeText.innerText = secLeft;
+            setTimeout(() => {
+              hugeText.classList.add("fading-out");
+              hugeText.style.opacity = 0;
+            }, 250);
+          },
+          total - secLeft * 1000,
+        ),
       );
 
       game.forceDrop.push(
-        setTimeout(() => forceDropNewObstacle(game, app.socket), total)
+        setTimeout(() => forceDropNewObstacle(game, app.socket), total),
       );
     };
 
@@ -169,8 +196,8 @@ export const newGame = (app, options, team1, team2) => {
           winner === "draw"
             ? "MATCH DRAW"
             : winner === teamString
-            ? "MATCH WON"
-            : "MATCH LOST";
+              ? "MATCH WON"
+              : "MATCH LOST";
         hugeText.innerText = `${score.join(" - ")}\n${resultText}`;
       };
       const fadeOutRoundText = () => {
@@ -198,7 +225,6 @@ export const newGame = (app, options, team1, team2) => {
 
     app.socket.json({ command: "client ready" });
   } else {
-    initializeObstacles(game);
     game.handleMessage = () => {};
     game.updatePlayers = () => {};
   }
@@ -214,25 +240,25 @@ const parseGameOptions = (app, game, options) => {
     // comments are the area of the map relative to the player
     case "small":
       //2427.25925926
-      game.playerRadius = 18;
-      game.moveSpeed = 6.25;
-      game.obstacleArea = 6;
-      game.obstacleStartCount = 20;
+      game.playerRadius = 16;
+      game.moveSpeed = 6.5;
+      game.obstacleArea = 7;
+      game.obstacleStartCount = 25;
       break;
 
     case "medium":
       //4012.40816327
-      game.playerRadius = 14;
-      game.moveSpeed = 6.25;
-      game.obstacleArea = 6;
-      game.obstacleStartCount = 33;
+      game.playerRadius = 12;
+      game.moveSpeed = 6.5;
+      game.obstacleArea = 7;
+      game.obstacleStartCount = 40;
       break;
     case "large":
       //5461.33333333
-      game.playerRadius = 12;
-      game.moveSpeed = 6.25;
-      game.obstacleArea = 6;
-      game.obstacleStartCount = 45;
+      game.playerRadius = 8;
+      game.moveSpeed = 6.5;
+      game.obstacleArea = 7;
+      game.obstacleStartCount = 60;
       break;
   }
 };

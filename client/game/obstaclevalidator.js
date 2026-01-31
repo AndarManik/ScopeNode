@@ -88,12 +88,15 @@ export const setupObstacleBlockers = (game, transform) => {
 
   game.obstacles = [];
   game.obstacleGroups = boundary.map(toMulti);
+  game.obstacleTotal = null;
   game.obstacleGroups.forEach((multi) => {
     if (!game.obstacleTotal) return (game.obstacleTotal = multi);
     game.obstacleTotal = removeHoles(martinez.union(game.obstacleTotal, multi));
   });
   game.obstacleRenderGroups = [...boundary];
 
+  game.pathTotal = null;
+  game.lightTotal = null;
   boundary.forEach((pathPoly) => pushPathingObstacle(game, { pathPoly }));
 
   const crossPoint1 = [

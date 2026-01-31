@@ -24,7 +24,7 @@ export const animateShot = (game, ctx, shot, s) => {
       {
         glowRadius: playerRadius / 1.25,
         glowColor: glowColor,
-        composite: "hard-light",
+        composite: "color-dodge",
       }
     );
   }
@@ -40,7 +40,7 @@ export const animateShot = (game, ctx, shot, s) => {
   if (dist < anim * bulletSpeed * playerRadius - bulletLength)
     shot.isHit = true;
 
-  if (4000 < anim * bulletSpeed * playerRadius - bulletLength)
+  if (1280 < anim * bulletSpeed * playerRadius - bulletLength)
     shot.finished = true;
 
   // Trail tuning: 10–20 playerRadius

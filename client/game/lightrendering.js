@@ -174,7 +174,7 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     hardA,
     hardB,
     buf,
-    scratch
+    scratch,
   ) => {
     const cctx = buf.ctx;
     clearCanvas(cctx);
@@ -326,7 +326,7 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
 
       gctx.globalCompositeOperation = "source-over";
 
-      ctx.globalCompositeOperation = "hard-light";
+      ctx.globalCompositeOperation = "color-dodge";
       ctx.drawImage(tint.canvas, 0, 0);
     }
 
@@ -361,7 +361,7 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     // 2) Build expanded obstacle mask and clip HARD T2b by it
     const obstacleExpandedMask = buildExpandedObstaclesMask(
       game.obstacles,
-      playerRadius
+      playerRadius,
     );
 
     subtractMaskInPlace(buffers.team1.t2b.ctx, obstacleExpandedMask);
@@ -371,7 +371,7 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     buildIntersectionInto(
       t1Masks.t1Mask,
       t2Masks.t1Mask,
-      buffers.intersectPoint
+      buffers.intersectPoint,
     );
 
     subtractMaskInPlace(buffers.team1.point.ctx, buffers.intersectPoint.canvas);
@@ -390,18 +390,18 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
       buffers.team1.t2b.canvas,
       buffers.team2.t2b.canvas,
       buffers.intersectDisk,
-      buffers.tint // scratch
+      buffers.tint, // scratch
     );
 
     // 4.5) Carve INTERSECT DISK out of both soft and hard T2b
     //      so the intersection region is isolated into intersectDisk.
     subtractMaskInPlace(
       buffers.team1.softT2b.ctx,
-      buffers.intersectDisk.canvas
+      buffers.intersectDisk.canvas,
     );
     subtractMaskInPlace(
       buffers.team2.softT2b.ctx,
-      buffers.intersectDisk.canvas
+      buffers.intersectDisk.canvas,
     );
     subtractMaskInPlace(buffers.team1.t2b.ctx, buffers.intersectDisk.canvas);
     subtractMaskInPlace(buffers.team2.t2b.ctx, buffers.intersectDisk.canvas);
@@ -412,13 +412,13 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     const team1DiskMask = buildUnionInto(
       buffers.team1.softT2b.canvas,
       buffers.team2.t2b.canvas,
-      buffers.team1DiskUnion
+      buffers.team1DiskUnion,
     );
 
     const team2DiskMask = buildUnionInto(
       buffers.team2.softT2b.canvas,
       buffers.team1.t2b.canvas,
-      buffers.team2DiskUnion
+      buffers.team2DiskUnion,
     );
 
     // 5) Build background mask AFTER HARD masks are finalized
@@ -426,10 +426,10 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     const backgroundMask = buildBackgroundMask(
       t1Masks,
       t2Masks,
-      game.obstacles
+      game.obstacles,
     );
 
-    const glowRadius = playerRadius / 1.25;
+    const glowRadius = (scale * playerRadius) / 2.5;
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -438,7 +438,7 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     const maybeGlow = (glowColor) => (glow ? { glowRadius, glowColor } : null);
 
     // 0) Draw BACKGROUND first
-    paintMask(backgroundMask, color.background, maybeGlow(color.intersectDisk));
+    paintMask(backgroundMask, color.background, maybeGlow(color.objectiveDisk));
 
     // 1) Draw both T1 (now WITHOUT intersection)
     paintMask(t1Masks.t1Mask, color.team1Point, maybeGlow(color.team1Disk));
@@ -448,7 +448,7 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     paintMask(
       buffers.intersectPoint.canvas,
       color.intersectPoint,
-      maybeGlow(color.intersectDisk)
+      maybeGlow(color.objectiveDisk),
     );
 
     // 3) Draw TEAM 1 disk region = soft₁ ∪ hard₂
@@ -461,7 +461,7 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
     paintMask(
       buffers.intersectDisk.canvas,
       color.intersectDisk,
-      maybeGlow(color.intersectDisk)
+      maybeGlow(color.objectiveDisk),
     );
 
     ctx.restore();
