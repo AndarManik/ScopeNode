@@ -8,7 +8,14 @@ export const render = (game, team1, team2) => {
   const { renderSettings, color, mapWidth, mapHeight, playerRadius } = game;
 
   let isTeam1 = game.isTeam1;
-  ({ team1, isTeam1 } = applyXSwap(game, team1, team2, isTeam1));
+  let team1Lights = game.team1Lights;
+  let team2Lights = game.team2Lights;
+  ({ team1, isTeam1, team1Lights, team2Lights } = applyXSwap(
+    game,
+    team1,
+    team2,
+    isTeam1,
+  ));
 
   ensureSceneCanvases(game, renderSettings, mapWidth, mapHeight);
 
@@ -26,7 +33,7 @@ export const render = (game, team1, team2) => {
     return;
   }
 
-  renderTeamLights(game, color, renderSettings);
+  renderTeamLights(game, team1Lights, team2Lights, color, renderSettings);
   renderMouseDot(ctx, game, isTeam1, color, playerRadius);
 
   if (game.isMultiPlayer) multiPlayerRender(game, ctx, team1, isTeam1);
@@ -110,16 +117,18 @@ const multiPlayerRender = (game, ctx, team1, isTeam1) => {
 };
 
 const applyXSwap = (game, team1, team2, isTeam1) => {
-  if (!game.xSwap) return { team1, isTeam1 };
+  let team1Lights = game.team1Lights;
+  let team2Lights = game.team2Lights;
 
-  team1 = team2;
-  isTeam1 = !isTeam1;
+  if (game.xSwap) {
+    team1 = team2;
+    isTeam1 = !isTeam1;
 
-  const temp = game.team1Lights;
-  game.team1Lights = game.team2Lights;
-  game.team2Lights = temp;
+    team1Lights = game.team2Lights;
+    team2Lights = game.team1Lights;
+  }
 
-  return { team1, isTeam1 };
+  return { team1, isTeam1, team1Lights, team2Lights };
 };
 
 const ensureSceneCanvases = (game, renderSettings, mapWidth, mapHeight) => {
@@ -148,13 +157,19 @@ const clearScene = (ctx, color, mapWidth, mapHeight) => {
   ctx.fill();
 };
 
-const renderTeamLights = (game, color, renderSettings) => {
+const renderTeamLights = (
+  game,
+  team1Lights,
+  team2Lights,
+  color,
+  renderSettings,
+) => {
   if (!game.lightGraph) return;
 
   game.lightRenderer(
     game,
-    [...game.team1Lights.values()],
-    [...game.team2Lights.values()],
+    [...team1Lights.values()],
+    [...team2Lights.values()],
     color,
     renderSettings.glowEnabled,
   );
@@ -166,7 +181,6 @@ const renderMouseDot = (ctx, game, isTeam1, color, playerRadius) => {
   ctx.arc(game.mouse[0], game.mouse[1], playerRadius / 5, 0, Math.PI * 2);
   ctx.fill();
 };
-
 
 function strokeFilletedPath(ctx, points, R) {
   const fp = filletPolyline(points, R);
