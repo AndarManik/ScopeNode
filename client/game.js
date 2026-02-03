@@ -32,8 +32,8 @@ export const newGame = (app, options, team1, team2) => {
   game.centerObjective = [game.mapWidth / 2, game.mapHeight / 2];
 
   if (!game.isMultiPlayer) {
-    team1 = new Set(["player", "t1"]);
-    team2 = new Set(["o1"]);
+    team1 = new Set(["player"]);
+    team2 = new Set(["o1", "o2"]);
     game.bots = [];
   }
 
@@ -52,7 +52,6 @@ export const newGame = (app, options, team1, team2) => {
     game.team2Lights = new Map();
 
     if (game.isMultiPlayer) return;
-    //game.playerIsDead = true;
     game.bots.length = 0;
 
     for (const uuid of team1)

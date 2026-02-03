@@ -7,6 +7,7 @@ export const newLobby = (code) => {
   const spectators = new Set();
 
   let state = "lobby";
+  const toWinMap = { small: 4, medium: 6, large: 8 };
 
   const lobby = { code, connected, mapSize: "medium" };
 
@@ -153,7 +154,6 @@ export const newLobby = (code) => {
     if (!team1.size || !team2.size) return;
     state = "starting game";
 
-    const toWinMap = { small: 4, medium: 6, large: 8 };
     lobby.toWin = toWinMap[lobby.mapSize];
     lobby.score = [0, 0];
 
@@ -290,6 +290,7 @@ export const newLobby = (code) => {
     if (socket.clientState !== "virtual server stopped") return;
     state = "distributing chosen obstacle";
     socket.clientState = "has confirmed obstacle";
+    socket.isBuilder = false;
     const obstacle = JSON.stringify(message);
     lobby.stateSend("needs confirmed obstacle", obstacle, socket);
   };

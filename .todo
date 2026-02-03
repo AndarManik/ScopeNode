@@ -11,12 +11,13 @@
 [ ] and mobile input
 
 [X] optimize pathing
+[ ] optimize safe pathing
 [ ] reimplement visibility graph
 
 [ ] sounds
 
 [ ] add tutorial puzzles
-[ ] implement single player AI
+[X] implement single player AI
 
 -Small things
 [X] Sync virtual server with game engine tick

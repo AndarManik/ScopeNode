@@ -450,8 +450,8 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
   game.drawPlayer(
     game.spawn1,
     playerRadius,
-    color.team1Player,
-    color.team1Gun,
+    game.xSwap ? color.team2Player : color.team1Player,
+    game.xSwap ? color.team2Gun : color.team1Gun,
     Math.atan2(
       game.spawn2[1] - game.spawn1[1],
       game.spawn2[0] - game.spawn1[0],
@@ -459,7 +459,7 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
     renderSettings.glowEnabled
       ? {
           glowRadius: playerRadius / 1.25,
-          glowColor: color.team1Disk,
+          glowColor: game.xSwap ? color.team2Disk : color.team1Disk,
           composite: "color-dodge",
         }
       : null,
@@ -475,8 +475,8 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
   game.drawPlayer(
     game.spawn2,
     playerRadius,
-    color.team2Player,
-    color.team2Gun,
+    game.xSwap ? color.team1Player : color.team2Player,
+    game.xSwap ? color.team1Gun : color.team2Gun,
     Math.atan2(
       game.spawn1[1] - game.spawn2[1],
       game.spawn1[0] - game.spawn2[0],
@@ -484,7 +484,7 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
     renderSettings.glowEnabled
       ? {
           glowRadius: playerRadius / 1.25,
-          glowColor: color.team2Disk,
+          glowColor: game.xSwap ? color.team1Disk : color.team2Disk,
           composite: "color-dodge",
         }
       : null,
@@ -493,12 +493,18 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
 
 const drawPreviewShots = (game, ctx, color, renderSettings) => {
   const playerRadius = game.playerRadius;
+
   game.virtualServer.shots.forEach(
     ({ team1, killerPosition, killedPosition, hit }) => {
-      // killer
-      const killerBodyColor = team1 ? color.team1Player : color.team2Player;
-      const killerGunColor = team1 ? color.team1Gun : color.team2Gun;
-      const killerGlowColor = team1 ? color.team1Disk : color.team2Disk;
+      // logical → visual team mapping
+      const isTeam1Visual = game.xSwap ? !team1 : team1;
+
+      // killer (visual team)
+      const killerBodyColor = isTeam1Visual
+        ? color.team1Player
+        : color.team2Player;
+      const killerGunColor = isTeam1Visual ? color.team1Gun : color.team2Gun;
+      const killerGlowColor = isTeam1Visual ? color.team1Disk : color.team2Disk;
 
       const killerAngle = Math.atan2(
         hit[1] - killerPosition[1],
@@ -520,10 +526,12 @@ const drawPreviewShots = (game, ctx, color, renderSettings) => {
           : null,
       );
 
-      // killed
-      const killedBodyColor = team1 ? color.team2Player : color.team1Player;
-      const killedGunColor = team1 ? color.team2Gun : color.team1Gun;
-      const killedGlowColor = team1 ? color.team2Disk : color.team1Disk;
+      // killed (opposite visual team)
+      const killedBodyColor = isTeam1Visual
+        ? color.team2Player
+        : color.team1Player;
+      const killedGunColor = isTeam1Visual ? color.team2Gun : color.team1Gun;
+      const killedGlowColor = isTeam1Visual ? color.team2Disk : color.team1Disk;
 
       const killedAngle = Math.atan2(
         killerPosition[1] - killedPosition[1],
@@ -545,8 +553,8 @@ const drawPreviewShots = (game, ctx, color, renderSettings) => {
           : null,
       );
 
-      // line
-      ctx.strokeStyle = team1 ? color.team1Gun : color.team2Gun;
+      // shot line (from killer’s visual team)
+      ctx.strokeStyle = isTeam1Visual ? color.team1Gun : color.team2Gun;
       ctx.lineWidth = (2 * playerRadius) / 5;
       ctx.lineCap = "round";
       ctx.beginPath();

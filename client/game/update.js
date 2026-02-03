@@ -56,14 +56,13 @@ const updateBotPositions = (game, team1, delta) => {
   const team2Distance = makeDistancePathToPolys(team2Target);
 
   for (const bot of game.bots) {
-    if (!bot.last || bot.last > Math.random() * 0.4) {
+    if (!bot.last || bot.last > bot.next) {
       bot.last = delta;
+      bot.next = Math.random();
       bot.path = null;
     }
     bot.last += delta;
   }
-
-  chooseObjectiveSeekers(game, team1, team1Distance, team2Distance);
 
   computeCandidates(
     game,
@@ -74,6 +73,8 @@ const updateBotPositions = (game, team1, delta) => {
     team2Distance,
     allKillTargets,
   );
+  
+  chooseObjectiveSeekers(game, team1, team1Distance, team2Distance);
 
   computeCandidates(
     game,
@@ -322,11 +323,18 @@ const updateSinglePlayerShots = (game, team1, delta) => {
 
   const gameOver = !team1States.length || !team2States.length;
 
+  const team1Name = game.renderSettings.xSwap
+    ? game.color.team2Name
+    : game.color.team1Name;
+  const team2Name = game.renderSettings.xSwap
+    ? game.color.team1Name
+    : game.color.team2Name;
+
   if (gameOver) {
     Huge.classList.remove("fading-out");
     Huge.style.opacity = 0.9;
     Huge.style.fontSize = "128";
-    Huge.innerText = team1States.length ? "Green Wins" : "Purple Wins";
+    Huge.innerText = (team1States.length ? team1Name : team2Name) + " Wins";
   }
 
   let allFinished = gameOver;

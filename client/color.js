@@ -46,6 +46,9 @@ export const newColor = (app) => {
 
     color.team1Gun = `oklch(0.60 0.100 ${hue - 45})`;
     color.team2Gun = `oklch(0.60 0.100 ${hue + 45})`;
+
+    color.team1Name = namehue(hue - 60);
+    color.team2Name = namehue(hue + 60);
   };
 
   color.setUIByHue = () => {
@@ -117,3 +120,20 @@ export const newColor = (app) => {
 };
 
 const golden = (i, n = i + 1) => (Math.sqrt(1.25 * n * n) - n / 2) % 1;
+
+const namehue = (hue, h = hue % 360) => {
+  for (const [name, end] of HUENAMES) if (h <= end) return name;
+};
+
+const HUENAMES = [
+  ["Red", 20],
+  ["Orange", 75],
+  ["Yellow", 105],
+  ["Lime", 130],
+  ["Green", 170],
+  ["Teal", 210],
+  ["Blue", 260],
+  ["Purple", 310],
+  ["Magenta", 340],
+  ["Red", 360],
+];

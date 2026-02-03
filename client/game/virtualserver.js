@@ -209,14 +209,13 @@ export const newVirtualServer = (game, app, team1, team2) => {
 
     for (const shot of newShots) {
       shots.add(shot);
-      if (shot.killed === game.userId) {
-        localHistory.length = 0;
-        game.playerIsDead = true;
-        return;
-      }
       globalStates.delete(shot.killed);
       globalHistories.delete(shot.killed);
       globalDead.add(shot.killed);
+      if (shot.killed !== game.userId) continue;  
+      
+      localHistory.length = 0;
+      game.playerIsDead = true;
     }
 
     socket.json({ command: "new shots", newShots, tick });
