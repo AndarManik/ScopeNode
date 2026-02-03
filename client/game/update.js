@@ -11,6 +11,7 @@ import {
   planPath,
   planPathSafe,
 } from "./pathing.js";
+import { kickout } from "./pathkickout.js";
 
 // There are a few abstactions here that are wrong.
 // The same thing happens to each player yet theres a function for each player,
@@ -56,9 +57,14 @@ const updateBotPositions = (game, team1, delta) => {
   const team2Distance = makeDistancePathToPolys(team2Target);
 
   for (const bot of game.bots) {
-    if (!bot.last || bot.last > bot.next) {
-      bot.last = delta;
-      bot.next = Math.random();
+    if (
+      !bot.last ||
+      !bot.path ||
+      bot.path.length <= 1 ||
+      bot.last + bot.var > 0.5
+    ) {
+      bot.last = 0;
+      bot.var = Math.random() * 0.2 - 0.1;
       bot.path = null;
     }
     bot.last += delta;
@@ -73,7 +79,7 @@ const updateBotPositions = (game, team1, delta) => {
     team2Distance,
     allKillTargets,
   );
-  
+
   chooseObjectiveSeekers(game, team1, team1Distance, team2Distance);
 
   computeCandidates(
@@ -94,11 +100,25 @@ const updateBotPositions = (game, team1, delta) => {
 };
 
 function chooseObjectiveSeekers(game, team1, team1Distance, team2Distance) {
+  const playerRadius = game.playerRadius;
   const team1ObjectiveSeeker = [Infinity, null];
   const team2ObjectiveSeeker = [Infinity, null];
 
   const [cx, cy] = game.centerObjective;
-  const offset = 1.9 * game.playerRadius;
+
+  const maxObjectiveRadius = Math.hypot(game.mapWidth, game.mapHeight);
+
+  const time = (performance.now() - game.startTime) / 1000;
+  const timeAlpha = Math.min(1, Math.max(0, (time - 30) / 30) ** 3);
+  const timeBeta = 1 - timeAlpha;
+  const rawObjectiveRadius =
+    timeBeta * playerRadius + timeAlpha * maxObjectiveRadius;
+  const objectiveRadius = Math.min(
+    rawObjectiveRadius,
+    maxObjectiveRadius + playerRadius,
+  );
+
+  const offset = objectiveRadius + 0.9 * playerRadius;
 
   for (const bot of game.bots) {
     if (bot.path) continue;
@@ -269,6 +289,7 @@ function moveBotsAlongPaths(game, delta) {
       bot.path,
       game.moveSpeed * game.playerRadius * delta,
     );
+    bot.position = kickout(bot.position, game.kickoutParams);
   }
 }
 

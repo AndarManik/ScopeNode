@@ -126,7 +126,7 @@ const namehue = (hue, h = hue % 360) => {
 };
 
 const HUENAMES = [
-  ["Red", 20],
+  ["Red", 30],
   ["Orange", 75],
   ["Yellow", 105],
   ["Lime", 130],

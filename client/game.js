@@ -52,6 +52,8 @@ export const newGame = (app, options, team1, team2) => {
     game.team2Lights = new Map();
 
     if (game.isMultiPlayer) return;
+
+    game.playerIsDead = true;
     game.bots.length = 0;
 
     for (const uuid of team1)
