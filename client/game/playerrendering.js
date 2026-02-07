@@ -3,7 +3,7 @@ export const createPlayerRenderer = (
   mapWidth,
   mapHeight,
   scale,
-  glowEnabled = true // hook this to renderSettings.glowEnabled
+  glowEnabled = true, // hook this to renderSettings.glowEnabled
 ) => {
   // We actually don't need pixelWidth/Height for the player glow;
   // objective uses mapWidth/mapHeight only to compute the max radius.
@@ -57,7 +57,7 @@ export const createPlayerRenderer = (
   const DEFAULT_SLICE_FRAC = 0.2;
   const DEFAULT_ALPHA = Math.asin(DEFAULT_SLICE_FRAC);
   const DEFAULT_X_SCALE = Math.sqrt(
-    1 - DEFAULT_SLICE_FRAC * DEFAULT_SLICE_FRAC
+    1 - DEFAULT_SLICE_FRAC * DEFAULT_SLICE_FRAC,
   );
 
   const drawPlayerCore = (
@@ -67,7 +67,7 @@ export const createPlayerRenderer = (
     r,
     sliceFrac,
     angle,
-    colors
+    colors,
   ) => {
     const { bodyColor, gunColor, curveColor } = colors;
 
@@ -159,7 +159,7 @@ export const createPlayerRenderer = (
     color,
     gun,
     angle = 0,
-    glow = null // { glowRadius, glowColor, composite? }
+    glow = null, // { glowRadius, glowColor, composite? }
   ) => {
     const sliceFrac = DEFAULT_SLICE_FRAC;
     const r = playerRadius;
@@ -237,7 +237,7 @@ export const createPlayerRenderer = (
     playerRadius,
     objectiveRadius,
     timeBeta,
-    styleColor
+    styleColor,
   ) => {
     const [ox, oy] = center;
 
@@ -257,14 +257,17 @@ export const createPlayerRenderer = (
         oy,
         objectiveRadius - targetCtx.lineWidth / 2,
         0,
-        Math.PI * 2
+        Math.PI * 2,
       );
       targetCtx.stroke();
     }
   };
 
   // ------------------------------------------------------------
-  // Objective wrapper: same glow pipeline, same color as itself
+  // Objective wrapper: draw team1 + team2 objectives (with overlap handling)
+  // ------------------------------------------------------------
+  // ------------------------------------------------------------
+  // Objective wrapper: draw team1 + team2 objectives (per-team glow)
   // ------------------------------------------------------------
   const drawObjective = (
     game,
@@ -272,95 +275,143 @@ export const createPlayerRenderer = (
     playerRadius,
     _mapWidth,
     _mapHeight,
-    color,
-    glow = null
+    color, // palette object OR legacy string
+    glowTeam1 = null,
+    glowTeam2 = null,
   ) => {
     const timeBeta = 1 - timeAlpha;
     const rawObjectiveRadius =
       timeBeta * playerRadius + timeAlpha * maxObjectiveRadius;
     const objectiveRadius = Math.min(
       rawObjectiveRadius,
-      maxObjectiveRadius + playerRadius
+      maxObjectiveRadius + playerRadius,
     );
 
-    const center = game.centerObjective;
+    // ---- Centers ----
+    const c1 = game.team1Objective;
+    const c2 = game.team2Objective;
 
-    // No glow if factory disabled glows or this call has glow = null
-    if (!glowEnabled || !glow) {
+    // ---- Colors (support legacy string call sites) ----
+
+    const team1Color = color.team1Objective;
+    const team2Color = color.team2Objective;
+    const centerColor = color.centerObjective;
+
+    // ---- Overlap detection ----
+    const dx = c1[0] - c2[0];
+    const dy = c1[1] - c2[1];
+    const d2 = dx * dx + dy * dy;
+
+    const OVERLAP_DIST = playerRadius * 1.25;
+    const overlaps = d2 <= OVERLAP_DIST * OVERLAP_DIST;
+
+    // ------------------------------------------------------------
+    // Helper: draw ONE objective with its OWN glow config
+    // ------------------------------------------------------------
+    const drawOne = (center, styleColor, glow) => {
+      // No glow if factory disabled glows OR this objective passes null
+      if (!glowEnabled || !glow) {
+        drawObjectiveCore(
+          ctx,
+          center,
+          playerRadius,
+          objectiveRadius,
+          timeBeta,
+          styleColor,
+        );
+        return;
+      }
+
+      const glowRadius = glow.glowRadius ?? playerRadius * 1.5;
+      const glowColor = glow.glowColor ?? styleColor;
+      const composite = glow.composite || "screen";
+
+      const { mask, glow: glowBuffer } = getBuffers();
+
+      const halfExtent = objectiveRadius + playerRadius;
+      const padding = glowRadius * 2;
+      const size = Math.ceil(halfExtent * 2 + padding * 2);
+
+      ensureSquareBuffer(mask, size);
+      ensureSquareBuffer(glowBuffer, size);
+
+      const mctx = mask.ctx;
+      const gctx = glowBuffer.ctx;
+      clearCtx(mctx);
+      clearCtx(gctx);
+
+      // 1) Mask
+      const bufferCenter = [size / 2, size / 2];
+      drawObjectiveCore(
+        mctx,
+        bufferCenter,
+        playerRadius,
+        objectiveRadius,
+        timeBeta,
+        "white",
+      );
+
+      // 2) Blur + tint
+      gctx.filter = `blur(${glowRadius}px)`;
+      gctx.globalCompositeOperation = "source-over";
+      gctx.drawImage(mask.canvas, 0, 0);
+
+      gctx.globalCompositeOperation = "source-in";
+      gctx.filter = "none";
+      gctx.fillStyle = glowColor;
+      gctx.fillRect(0, 0, size, size);
+      gctx.globalCompositeOperation = "source-over";
+
+      // 3) Composite glow
+      const prevGCO = ctx.globalCompositeOperation;
+      ctx.globalCompositeOperation = composite;
+      ctx.drawImage(
+        glowBuffer.canvas,
+        center[0] - size / 2,
+        center[1] - size / 2,
+      );
+      ctx.globalCompositeOperation = prevGCO;
+
+      // 4) Sharp geometry
       drawObjectiveCore(
         ctx,
         center,
         playerRadius,
         objectiveRadius,
         timeBeta,
-        color
+        styleColor,
       );
+    };
+
+    // ------------------------------------------------------------
+    // Render
+    // ------------------------------------------------------------
+    if (!overlaps) {
+      drawOne(c1, team1Color, glowTeam1);
+      drawOne(c2, team2Color, glowTeam2);
       return;
     }
 
-    // --- Glow parameters ---
-    const glowRadius = glow.glowRadius ?? playerRadius * 1.5;
-    const glowColor = glow.glowColor ?? color; // glow same color as itself
-    const composite = glow.composite || "screen";
+    // Overlapping: dampen intensity slightly
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = prevAlpha * 0.65;
 
-    const { mask, glow: glowBuffer } = getBuffers();
+    drawOne(c1, team1Color, glowTeam1);
+    drawOne(c2, team2Color, glowTeam2);
 
-    // Extents of the ring: outer radius ~ objectiveRadius + playerRadius
-    const halfExtent = objectiveRadius + playerRadius;
-    const padding = glowRadius * 2;
-    const size = Math.ceil(halfExtent * 2 + padding * 2);
+    ctx.globalAlpha = prevAlpha;
 
-    // Resize buffers to fit this (larger) shape
-    ensureSquareBuffer(mask, size);
-    ensureSquareBuffer(glowBuffer, size);
+    // Center merge marker
+    const mid = [(c1[0] + c2[0]) / 2, (c1[1] + c2[1]) / 2];
+    const markerR = Math.max(playerRadius * 0.9, 2);
 
-    const mctx = mask.ctx;
-    const gctx = glowBuffer.ctx;
-    clearCtx(mctx);
-    clearCtx(gctx);
-
-    // 1. Draw white objective shape into mask buffer, centered in that buffer
-    const bufferCenter = [size / 2, size / 2];
-    drawObjectiveCore(
-      mctx,
-      bufferCenter,
-      playerRadius,
-      objectiveRadius,
-      timeBeta,
-      "white"
-    );
-
-    // 2. Blur mask and tint with objective color
-    gctx.filter = `blur(${glowRadius}px)`;
-    gctx.globalCompositeOperation = "source-over";
-    gctx.drawImage(mask.canvas, 0, 0);
-
-    gctx.globalCompositeOperation = "source-in";
-    gctx.filter = "none";
-    gctx.fillStyle = glowColor;
-    gctx.fillRect(0, 0, size, size);
-
-    gctx.globalCompositeOperation = "source-over";
-
-    // 3. Composite glow on main ctx
-    const prevGCO = ctx.globalCompositeOperation;
-    ctx.globalCompositeOperation = composite;
-    ctx.drawImage(
-      glowBuffer.canvas,
-      center[0] - size / 2,
-      center[1] - size / 2
-    );
-    ctx.globalCompositeOperation = prevGCO;
-
-    // 4. Draw sharp objective on top
-    drawObjectiveCore(
-      ctx,
-      center,
-      playerRadius,
-      objectiveRadius,
-      timeBeta,
-      color
-    );
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.fillStyle = centerColor;
+    ctx.beginPath();
+    ctx.arc(mid[0], mid[1], markerR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   };
 
   // ------------------------------------------------------------

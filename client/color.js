@@ -25,10 +25,13 @@ export const newColor = (app) => {
 
     color.team1Player = `oklch(0.85 0.075 ${hue - 72})`;
     color.team2Player = `oklch(0.85 0.075 ${hue + 72})`;
-    color.centerObjective = `oklch(0.85 0.075 ${hue})`;
 
-    color.team1Path = `oklch(0.90 0.040 ${hue - 72})`;
-    color.team2Path = `oklch(0.90 0.040 ${hue + 72})`;
+    color.team1Objective = `oklch(0.90 0.045 ${hue - 45})`;
+    color.team2Objective = `oklch(0.90 0.045 ${hue + 45})`;
+    color.centerObjective = `oklch(0.90 0.045 ${hue})`;
+
+    color.team1Path = `oklch(0.90 0.045 ${hue - 72})`;
+    color.team2Path = `oklch(0.90 0.045 ${hue + 72})`;
 
     color.team1Point = `oklch(0.35 0.025 ${hue - 45})`;
     color.team2Point = `oklch(0.35 0.025 ${hue + 45})`;
@@ -121,7 +124,7 @@ export const newColor = (app) => {
 
 const golden = (i, n = i + 1) => (Math.sqrt(1.25 * n * n) - n / 2) % 1;
 
-const namehue = (hue, h = hue % 360) => {
+const namehue = (hue, h = (360 + hue) % 360) => {
   for (const [name, end] of HUENAMES) if (h <= end) return name;
 };
 

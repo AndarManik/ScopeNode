@@ -100,14 +100,16 @@ export const setupObstacleBlockers = (game, transform) => {
   boundary.forEach((pathPoly) => pushPathingObstacle(game, { pathPoly }));
 
   const crossPoint1 = [
-    mapWidth / 8,
+    (mapWidth * Math.random()) / 2 + mapWidth / 4,
     Math.random() < 0.5 ? playerRadius + 1 : mapHeight - playerRadius - 1,
   ];
   const crossPoint2 = transform(game, crossPoint1);
 
   game.obstacleBlockers = [
-    [[crossbarsAt(crossPoint1, game.centerObjective)]],
-    [[crossbarsAt(crossPoint2, game.centerObjective)]],
+    [[crossbarsAt(crossPoint1, game.team1Objective)]],
+    [[crossbarsAt(crossPoint2, game.team2Objective)]],
+    [[crossbarsAt(crossPoint1, game.team2Objective)]],
+    [[crossbarsAt(crossPoint2, game.team1Objective)]],
     [[crossbarsAt(game.spawn1, crossPoint1)]],
     [[crossbarsAt(game.spawn2, crossPoint2)]],
   ];

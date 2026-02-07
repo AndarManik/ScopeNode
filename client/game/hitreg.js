@@ -6,7 +6,6 @@ export const registerTeamHits = (game, team1States, team2States, time) => {
     (1 - timeAlpha) * playerRadius +
     timeAlpha * Math.hypot(game.mapWidth, game.mapHeight);
 
-  const center = game.centerObjective;
   const shots = [];
 
   for (const team1Player of team1States) {
@@ -45,10 +44,11 @@ export const registerTeamHits = (game, team1States, team2States, time) => {
     }
   }
 
+  const { team1Objective, team2Objective } = game;
   // team1 touching objective wins vs all team2
   for (const team1Player of team1States) {
-    const dx = team1Player.position[0] - center[0];
-    const dy = team1Player.position[1] - center[1];
+    const dx = team1Player.position[0] - team1Objective[0];
+    const dy = team1Player.position[1] - team1Objective[1];
     const dist = Math.sqrt(dx * dx + dy * dy) - playerRadius;
     if (dist > obstacleRadius) continue;
     const uuid1 = team1Player.uuid;
@@ -67,8 +67,8 @@ export const registerTeamHits = (game, team1States, team2States, time) => {
 
   // team2 touching objective wins vs all team1
   for (const team2Player of team2States) {
-    const dx = team2Player.position[0] - center[0];
-    const dy = team2Player.position[1] - center[1];
+    const dx = team2Player.position[0] - team2Objective[0];
+    const dy = team2Player.position[1] - team2Objective[1];
     const dist = Math.sqrt(dx * dx + dy * dy) - playerRadius;
     if (dist > obstacleRadius) continue;
     const uuid2 = team2Player.uuid;

@@ -50,12 +50,14 @@ const singlePlayerUpdate = (game, delta, team1) => {
 };
 
 const updateBotPositions = (game, team1, delta) => {
-  const team1Target = [...game.team1Lights.values()];
-  const team2Target = [...game.team2Lights.values()];
+  game.team1Target = [...game.team1Lights.values()];
+  game.team2Target = [...game.team2Lights.values()];
 
-  const team1Distance = makeDistancePathToPolys(team1Target);
-  const team2Distance = makeDistancePathToPolys(team2Target);
+  game.team1Distance = makeDistancePathToPolys(game.team1Target);
+  game.team2Distance = makeDistancePathToPolys(game.team2Target);
 
+  game.team1Used = [];
+  game.team2Used = [];
   for (const bot of game.bots) {
     if (
       !bot.last ||
@@ -67,44 +69,37 @@ const updateBotPositions = (game, team1, delta) => {
       bot.var = Math.random() * 0.2 - 0.1;
       bot.path = null;
     }
+
+    if (bot.path) {
+      team1.has(bot.uuid)
+        ? game.team1Used.push(bot.path[bot.path.length - 1])
+        : game.team2Used.push(bot.path[bot.path.length - 1]);
+    }
+
     bot.last += delta;
   }
 
-  computeCandidates(
-    game,
-    team1,
-    team1Target,
-    team2Target,
-    team1Distance,
-    team2Distance,
-    allKillTargets,
-  );
+  for (const bot of game.bots) {
+    const toObjective = objectiveLocation(game, team1, bot);
 
-  chooseObjectiveSeekers(game, team1, team1Distance, team2Distance);
-
-  computeCandidates(
-    game,
-    team1,
-    team1Target,
-    team2Target,
-    team1Distance,
-    team2Distance,
-    allDieTargets,
-  );
+    pathBotToTargets(game, team1, () => [toObjective], bot);
+    pathBotToTargets(game, team1, allKillTargets, bot);
+    pathBotToTargets(game, team1, allDieTargets, bot);
+  }
 
   for (const bot of game.bots) if (!bot.path) bot.path = [];
 
   moveBotsAlongPaths(game, delta);
 
-  updateBotAimTargets(game, team1, delta, team1Target, team2Target);
+  updateBotAimTargets(game, team1, delta);
 };
 
-function chooseObjectiveSeekers(game, team1, team1Distance, team2Distance) {
+function objectiveLocation(game, team1, bot) {
   const playerRadius = game.playerRadius;
-  const team1ObjectiveSeeker = [Infinity, null];
-  const team2ObjectiveSeeker = [Infinity, null];
 
-  const [cx, cy] = game.centerObjective;
+  const [cx, cy] = team1.has(bot.uuid)
+    ? game.team1Objective
+    : game.team2Objective;
 
   const maxObjectiveRadius = Math.hypot(game.mapWidth, game.mapHeight);
 
@@ -120,170 +115,55 @@ function chooseObjectiveSeekers(game, team1, team1Distance, team2Distance) {
 
   const offset = objectiveRadius + 0.9 * playerRadius;
 
-  for (const bot of game.bots) {
-    if (bot.path) continue;
-    const isTeam1 = team1.has(bot.uuid);
-    const avoid = isTeam1 ? team2Distance : team1Distance;
-
-    const dx = bot.position[0] - cx;
-    const dy = bot.position[1] - cy;
-    const len = Math.hypot(dx, dy) || 1;
-    const desired = [cx + (dx / len) * offset, cy + (dy / len) * offset];
-
-    bot.toObjective = planPathSafe(game, bot.position, desired, avoid);
-
-    const distance = bot.toObjective.distance;
-    const seeker = isTeam1 ? team1ObjectiveSeeker : team2ObjectiveSeeker;
-
-    if (distance >= seeker[0]) continue;
-
-    seeker[0] = distance;
-    seeker[1] = bot;
-  }
-
-  if (team1ObjectiveSeeker[1])
-    team1ObjectiveSeeker[1].path = team1ObjectiveSeeker[1].toObjective.path;
-  if (team2ObjectiveSeeker[1])
-    team2ObjectiveSeeker[1].path = team2ObjectiveSeeker[1].toObjective.path;
+  const dx = bot.position[0] - cx;
+  const dy = bot.position[1] - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  const desired = [cx + (dx / len) * offset, cy + (dy / len) * offset];
+  return desired;
 }
 
-function computeCandidates(
-  game,
-  team1,
-  team1Target,
-  team2Target,
-  team1Distance,
-  team2Distance,
-  allTargetsFn, // (game, botPos, avoidPolys) => [ [x,y], ... ]
-) {
+function pathBotToTargets(game, team1, targetFunc, bot) {
+  if (bot.path) return;
+
   const STEP = game.playerRadius * 4;
   const STEP2 = STEP * STEP;
 
-  // Run identical logic for each team by swapping avoid/avoidDistance.
-  const teamDescs = [
-    { isTeam1: true, avoid: team2Target, avoidDistance: team2Distance },
-    { isTeam1: false, avoid: team1Target, avoidDistance: team1Distance },
-  ];
+  const isTeam1 = team1.has(bot.uuid);
 
-  for (let td = 0; td < teamDescs.length; td++) {
-    const { isTeam1, avoid, avoidDistance } = teamDescs[td];
-
-    // Collect bots on this team that still need a path.
-    const bots = [];
-    for (let i = 0; i < game.bots.length; i++) {
-      const bot = game.bots[i];
-      if (bot.path) continue;
-      if (team1.has(bot.uuid) === isTeam1) bots.push(bot);
-    }
-    if (bots.length === 0) continue;
-
-    // Precompute each bot's target list once; then we keep pruning it.
-    const remainingTargets = new Map(); // uuid -> [points]
-    for (let i = 0; i < bots.length; i++) {
-      const bot = bots[i];
-      remainingTargets.set(bot.uuid, allTargetsFn(game, bot.position, avoid));
-    }
-
-    const assigned = []; // committed target points
-
-    const filterAgainstAssigned = (targets) => {
-      if (!targets || targets.length === 0) return targets;
-      if (assigned.length === 0) return targets;
-
-      const out = [];
-      outer: for (let i = 0; i < targets.length; i++) {
-        const p = targets[i];
-        const px = p[0],
-          py = p[1];
-        for (let j = 0; j < assigned.length; j++) {
-          const a = assigned[j];
-          const dx = px - a[0];
-          const dy = py - a[1];
-          if (dx * dx + dy * dy < STEP2) continue outer;
-        }
-        out.push(p);
+  const enemyExposure = isTeam1 ? game.team2Target : game.team1Target;
+  const teamUsed = isTeam1 ? game.team1Used : game.team2Used;
+  const targets = targetFunc(game, bot.position, enemyExposure).filter(
+    ([targetX, targetY]) => {
+      for (const [usedX, usedY] of teamUsed) {
+        const dx = targetX - usedX;
+        const dy = targetY - usedY;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < STEP2) return false;
       }
-      return out;
-    };
+      return true;
+    },
+  );
 
-    // Greedy global assignment: each round pick best (bot,target) across all bots.
-    while (true) {
-      let bestBot = null;
-      let bestPath = null;
-      let bestDist = Infinity;
-      let bestTarget = null;
-
-      for (let i = 0; i < bots.length; i++) {
-        const bot = bots[i];
-        if (bot.path) continue;
-
-        let targets = remainingTargets.get(bot.uuid);
-        if (!targets || targets.length === 0) continue;
-
-        targets = filterAgainstAssigned(targets);
-        remainingTargets.set(bot.uuid, targets);
-        if (targets.length === 0) continue;
-
-        let botBestDist = Infinity;
-        let botBestPath = null;
-        let botBestTarget = null;
-
-        for (let k = 0; k < targets.length; k++) {
-          const point = targets[k];
-          const { path, distance } = planPathSafe(
-            game,
-            bot.position,
-            point,
-            avoidDistance,
-          );
-
-          if (distance < botBestDist) {
-            botBestDist = distance;
-            botBestPath = path;
-            botBestTarget = point;
-          }
-        }
-
-        if (botBestPath && botBestDist < bestDist) {
-          bestDist = botBestDist;
-          bestPath = botBestPath;
-          bestBot = bot;
-          bestTarget = botBestTarget;
-        }
-      }
-
-      if (!bestBot) break;
-
-      // Commit best assignment.
-      bestBot.path = bestPath;
-      assigned.push(bestTarget);
-
-      // Aggressively prune remaining target lists vs the newly assigned target.
-      const ax = bestTarget[0],
-        ay = bestTarget[1];
-      for (let i = 0; i < bots.length; i++) {
-        const bot = bots[i];
-        if (bot.path) continue;
-
-        const targets = remainingTargets.get(bot.uuid);
-        if (!targets || targets.length === 0) continue;
-
-        const out = [];
-        for (let k = 0; k < targets.length; k++) {
-          const p = targets[k];
-          const dx = p[0] - ax;
-          const dy = p[1] - ay;
-          if (dx * dx + dy * dy >= STEP2) out.push(p);
-        }
-        remainingTargets.set(bot.uuid, out);
-      }
-    }
+  const avoid = isTeam1 ? game.team2Distance : game.team1Distance;
+  let bestDistance = Infinity;
+  let bestTarget = null;
+  let bestPath = null;
+  for (const target of targets) {
+    const { path, distance } = planPathSafe(game, bot.position, target, avoid);
+    if (distance >= bestDistance) continue;
+    bestDistance = distance;
+    bestTarget = target;
+    bestPath = path;
   }
+
+  if (!bestPath) return;
+
+  bot.path = bestPath;
+  teamUsed.push(bestTarget);
 }
 
 function moveBotsAlongPaths(game, delta) {
   for (const bot of game.bots) {
-    if (!bot.path) bot.path = [];
     moveAlongPath(
       bot.position,
       bot.path,
@@ -293,7 +173,8 @@ function moveBotsAlongPaths(game, delta) {
   }
 }
 
-function updateBotAimTargets(game, team1, delta, team1Target, team2Target) {
+function updateBotAimTargets(game, team1, delta) {
+  const { team1Target, team2Target } = game;
   for (const bot of game.bots) {
     const isTeam1 = team1.has(bot.uuid);
     const shooter = isTeam1
@@ -351,11 +232,19 @@ const updateSinglePlayerShots = (game, team1, delta) => {
     ? game.color.team1Name
     : game.color.team2Name;
 
+  const team1Color = game.renderSettings.xSwap
+    ? game.color.team2Bullet
+    : game.color.team1Bullet;
+  const team2Color = game.renderSettings.xSwap
+    ? game.color.team1Bullet
+    : game.color.team2Bullet;
+
   if (gameOver) {
     Huge.classList.remove("fading-out");
     Huge.style.opacity = 0.9;
-    Huge.style.fontSize = "128";
+    Huge.style.fontSize = "128px";
     Huge.innerText = (team1States.length ? team1Name : team2Name) + " Wins";
+    Huge.style.color = team1States.length ? team1Color : team2Color;
   }
 
   let allFinished = gameOver;

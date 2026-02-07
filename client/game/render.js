@@ -345,11 +345,18 @@ const renderObjectiveIfNeeded = (
     playerRadius,
     mapWidth,
     mapHeight,
-    color.centerObjective,
+    color,
     renderSettings.glowEnabled
       ? {
           glowRadius: playerRadius / 1.25,
-          glowColor: color.objectiveDisk,
+          glowColor: color.team1Objective,
+          composite: "color-dodge",
+        }
+      : null,
+    renderSettings.glowEnabled
+      ? {
+          glowRadius: playerRadius / 1.25,
+          glowColor: color.team2Objective,
           composite: "color-dodge",
         }
       : null,
@@ -466,9 +473,14 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
   );
 
   // center objective
-  ctx.fillStyle = color.centerObjective;
+  ctx.fillStyle = color.team1Objective;
   ctx.beginPath();
-  ctx.arc(...game.centerObjective, playerRadius, 0, Math.PI * 2);
+  ctx.arc(...game.team1Objective, playerRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = color.team2Objective;
+  ctx.beginPath();
+  ctx.arc(...game.team2Objective, playerRadius, 0, Math.PI * 2);
   ctx.fill();
 
   // spawn2

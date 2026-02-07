@@ -10,18 +10,23 @@ import { pushManyPathingObstacle, pushPathingObstacle } from "./pathing.js";
 
 export const initializeObstacles = (game, whenDone) => {
   const style = Math.random() < 0.5 ? mirrorAcrossMap : rotateAcrossMap;
+
+  const vary = (Math.random() * game.mapWidth) / 4;
+  game.team1Objective = [(5 * game.mapWidth) / 8 + vary, game.mapHeight / 2];
+  game.team2Objective = [(3 * game.mapWidth) / 8 - vary, game.mapHeight / 2];
+
   setupObstacleBlockers(game, style);
 
   let count = 0;
   const obstacleArea = game.obstacleArea;
 
   const pushTwo = () => {
-    const prealpha = (2 * count) / game.obstacleStartCount
-    const alpha = prealpha;
-    game.obstacleArea = alpha * obstacleArea + (1 - alpha) * 3;
+    const prealpha = (2 * count) / game.obstacleStartCount;
+    const alpha = 1 - Math.sqrt(prealpha);
+    game.obstacleArea = alpha * obstacleArea + (1 - alpha) * 4;
 
     while (true) {
-      let pos = sampleNormal(game);
+      let pos = sampleUniform(game);
       if (count === 0) pos[1] = game.mapHeight / 2;
       const obstacle1 = generateObstacle(game, pos);
       const obstacle2 = generateObstacle(game, style(game, pos));
@@ -30,8 +35,14 @@ export const initializeObstacles = (game, whenDone) => {
       validateNewObstacle(game, obstacle2);
       if (obstacle1.index === -1) continue;
       if (obstacle2.index === -1) continue;
-      pushValidObstacle(game, obstacle1);
-      pushValidObstacle(game, obstacle2);
+      if (Math.random() < 0.5) {
+        pushValidObstacle(game, obstacle1);
+        pushValidObstacle(game, obstacle2);
+      } else {
+        pushValidObstacle(game, obstacle2);
+        pushValidObstacle(game, obstacle1);
+      }
+
       break;
     }
     count += 1;
@@ -62,7 +73,7 @@ export const newObstaclePreview = (game, socket) => {
     game,
     game.mouse,
     game.previewAngle,
-    game.previewAlpha
+    game.previewAlpha,
   );
   validateNewObstacle(game, game.previewObstacle);
 
@@ -83,7 +94,7 @@ export const newObstaclePreview = (game, socket) => {
       angle: game.previewAngle,
       alpha: game.previewAlpha,
       index: game.previewObstacle.index,
-    })
+    }),
   );
 };
 
@@ -123,7 +134,7 @@ export const receivePreviewObstacle = (game, data) => {
     game,
     obstacle.position,
     obstacle.angle,
-    obstacle.alpha
+    obstacle.alpha,
   );
   game.previewObstacle.index = obstacle.index;
   return true;
@@ -134,7 +145,7 @@ export const confirmPreviewObstacle = (game, obstacle) => {
     game,
     obstacle.position,
     obstacle.angle,
-    obstacle.alpha
+    obstacle.alpha,
   );
   addObstacle(game, game.previewObstacle);
 };
@@ -147,9 +158,14 @@ export const addObstacle = (game, obstacle) => {
 
 const randomNormal = (a = Math.random(), b = Math.random()) =>
   Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b);
-const sampleNormal = (game, W = game.mapWidth, H = game.mapHeight, s = 2/3) => [
+const sampleNormal = (game, W = game.mapWidth, H = game.mapHeight, s = 0.8) => [
   Math.min(W, Math.max(0, W / 2 + randomNormal() * (W / 2) * s)),
   Math.min(H, Math.max(0, H / 2 + randomNormal() * (H / 2) * s)),
+];
+
+const sampleUniform = (game, W = game.mapWidth, H = game.mapHeight) => [
+  W * Math.random(),
+  H * Math.random(),
 ];
 const mirrorAcrossMap = (game, [x, y]) => [game.mapWidth - x, y];
 const rotateAcrossMap = (game, [x, y]) => [

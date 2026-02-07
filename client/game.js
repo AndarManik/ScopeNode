@@ -27,12 +27,11 @@ export const newGame = (app, options, team1, team2) => {
   game.isSpec = false;
   if (!game.isTeam1 && !team2.has(game.userId)) game.isSpec = true;
 
-  game.spawn1 = [3 * game.playerRadius, game.mapHeight / 2];
-  game.spawn2 = [game.mapWidth - 3 * game.playerRadius, game.mapHeight / 2];
-  game.centerObjective = [game.mapWidth / 2, game.mapHeight / 2];
+  game.spawn1 = [2 * game.playerRadius, game.mapHeight / 2];
+  game.spawn2 = [game.mapWidth - 2 * game.playerRadius, game.mapHeight / 2];
 
   if (!game.isMultiPlayer) {
-    team1 = new Set(["player"]);
+    team1 = new Set(["player", "t1"]);
     team2 = new Set(["o1", "o2"]);
     game.bots = [];
   }
@@ -53,7 +52,7 @@ export const newGame = (app, options, team1, team2) => {
 
     if (game.isMultiPlayer) return;
 
-    //game.playerIsDead = true;
+    game.playerIsDead = true;
     game.bots.length = 0;
 
     for (const uuid of team1)
@@ -238,28 +237,24 @@ const parseGameOptions = (app, game, options) => {
   Object.assign(game, app.settings.game);
 
   switch (options) {
-    // comments are the area of the map relative to the player
     case "small":
-      //2427.25925926
       game.playerRadius = 16;
       game.moveSpeed = 6.5;
-      game.obstacleArea = 7;
-      game.obstacleStartCount = 25;
+      game.obstacleArea = 12;
+      game.obstacleStartCount = 15;
       break;
 
     case "medium":
-      //4012.40816327
       game.playerRadius = 12;
       game.moveSpeed = 6.5;
-      game.obstacleArea = 7;
-      game.obstacleStartCount = 40;
+      game.obstacleArea = 12;
+      game.obstacleStartCount = 30;
       break;
     case "large":
-      //5461.33333333
       game.playerRadius = 8;
       game.moveSpeed = 6.5;
-      game.obstacleArea = 7;
-      game.obstacleStartCount = 60;
+      game.obstacleArea = 12;
+      game.obstacleStartCount = 65;
       break;
   }
 };
