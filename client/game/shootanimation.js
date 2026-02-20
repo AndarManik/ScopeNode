@@ -24,7 +24,7 @@ export const animateShot = (game, ctx, shot, s) => {
       {
         glowRadius: playerRadius / 1.25,
         glowColor: glowColor,
-        composite: "color-dodge",
+        composite: "screen",
       }
     );
   }

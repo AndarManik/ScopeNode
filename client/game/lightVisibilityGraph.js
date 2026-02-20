@@ -102,7 +102,7 @@ export class LightGraph {
     this._reallowRingSides(idxs);
   }
 
-  shineAt(pos) {
+  shineAt(pos, radius = this.radius) {
     const pointPoly = [];
     const diskPoly = [];
     const visibleIndices = this.visibleIndicesAt(pos);
@@ -148,7 +148,7 @@ export class LightGraph {
     while (toCone.length) {
       const index = toCone.pop();
       if (diskConed.has(index)) continue;
-      const { diskCones, diskCascade } = this.diskConesAt(pos, index);
+      const { diskCones, diskCascade } = this.diskConesAt(pos, index, radius);
       diskPoly.push(...diskCones);
       toCone.push(...diskCascade);
       diskConed.add(index);
@@ -172,7 +172,7 @@ export class LightGraph {
 
   // segment fusing is done to reduce number of vertex shine calls.
 
-  diskConesAt(pos, index) {
+  diskConesAt(pos, index, radius) {
     const vertex = this.vertices[index];
     const delta = [vertex[0] - pos[0], vertex[1] - pos[1]];
     const direction = Math.atan2(delta[1], delta[0]);
@@ -184,7 +184,7 @@ export class LightGraph {
     const prevAngleDist = minAngleDist(aPrev, direction);
     const nextAngleDist = minAngleDist(aNext, direction);
     const minAngle = Math.min(prevAngleDist, nextAngleDist);
-    const angleDelta = Math.min(minAngle, Math.asin(this.radius / distance));
+    const angleDelta = Math.min(minAngle, Math.asin(radius / distance));
 
     const relativeStart = opDirection - angleDelta + Math.PI;
     const sweepWidth = 2 * angleDelta;
@@ -310,8 +310,8 @@ export class LightGraph {
       storeShine(
         index,
         start ? sweepStart : wrapToPi(curr.angle + Math.PI),
-        end ? sweepEnd : wrapToPi(next.angle + Math.PI)
-      )
+        end ? sweepEnd : wrapToPi(next.angle + Math.PI),
+      ),
     );
 
     return { diskCones, diskCascade };
@@ -452,7 +452,7 @@ export class LightGraph {
               origin,
               dir,
               ed.bbox,
-              this._EPS
+              this._EPS,
             );
             if (!boxHit) continue;
             if (boxHit.tEnter >= bestT) continue;
@@ -992,7 +992,7 @@ export class LightGraph {
             origin,
             dir,
             ed.bbox,
-            this._EPS
+            this._EPS,
           );
           if (!boxHit) continue;
           if (boxHit.tEnter >= bestT) continue;
@@ -1085,7 +1085,7 @@ export class LightGraph {
     const rayHit = this._vertexRaycast(j, angle);
     const rayDistance = Math.hypot(
       rayHit[0] - vertex[0],
-      rayHit[1] - vertex[1]
+      rayHit[1] - vertex[1],
     );
     return rayDistance >= distance;
   }
@@ -1108,7 +1108,7 @@ export class LightGraph {
       A,
       B,
       eps,
-      skipPolyOwningEndpoints ? { i, j } : null
+      skipPolyOwningEndpoints ? { i, j } : null,
     );
     if (crosses) return false;
 

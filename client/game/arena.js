@@ -12,8 +12,8 @@ export const initializeObstacles = (game, whenDone) => {
   const style = Math.random() < 0.5 ? mirrorAcrossMap : rotateAcrossMap;
 
   const vary = (Math.random() * game.mapWidth) / 4;
-  game.team1Objective = [(5 * game.mapWidth) / 8 + vary, game.mapHeight / 2];
-  game.team2Objective = [(3 * game.mapWidth) / 8 - vary, game.mapHeight / 2];
+  game.team1Objective = [(11 * game.mapWidth) / 16 + vary, game.mapHeight / 2];
+  game.team2Objective = [(5 * game.mapWidth) / 16 - vary, game.mapHeight / 2];
 
   setupObstacleBlockers(game, style);
 
@@ -21,8 +21,8 @@ export const initializeObstacles = (game, whenDone) => {
   const obstacleArea = game.obstacleArea;
 
   const pushTwo = () => {
-    const prealpha = (2 * count) / game.obstacleStartCount;
-    const alpha = 1 - Math.sqrt(prealpha);
+    const prealpha = count / game.obstacleStartCount;
+    const alpha = 1 - prealpha;
     game.obstacleArea = alpha * obstacleArea + (1 - alpha) * 4;
 
     while (true) {
@@ -35,18 +35,22 @@ export const initializeObstacles = (game, whenDone) => {
       validateNewObstacle(game, obstacle2);
       if (obstacle1.index === -1) continue;
       if (obstacle2.index === -1) continue;
-      if (Math.random() < 0.5) {
-        pushValidObstacle(game, obstacle1);
-        pushValidObstacle(game, obstacle2);
-      } else {
-        pushValidObstacle(game, obstacle2);
-        pushValidObstacle(game, obstacle1);
+      if (count <= game.obstacleStartCount / 3) {
+        if (obstacle1.index < game.obstacleGroups.length) continue;
+        if (obstacle2.index < game.obstacleGroups.length) continue;
       }
 
+      if (Math.random() < 0.5) {
+        count += pushValidObstacle(game, obstacle1);
+        count += pushValidObstacle(game, obstacle2);
+      } else {
+        count += pushValidObstacle(game, obstacle2);
+        count += pushValidObstacle(game, obstacle1);
+      }
       break;
     }
-    count += 1;
-    if (count <= game.obstacleStartCount / 2)
+
+    if (count <= game.obstacleStartCount)
       if (whenDone) return pushTwo();
       else return setTimeout(pushTwo, 1000 / 20);
 
@@ -60,10 +64,14 @@ export const initializeObstacles = (game, whenDone) => {
 };
 
 export const initializeReceivedObstacles = (game, data) => {
-  const [obstacles, blockers] = data;
+  game.team1Objective = data.team1Objective;
+  game.team2Objective = data.team2Objective;
+
   setupObstacleBlockers(game, mirrorAcrossMap);
-  game.obstacleBlockers = blockers;
-  obstacles.forEach((obstacle) => pushValidObstacle(game, obstacle));
+
+  game.obstacleBlockers = data.blockers;
+
+  data.obstacles.forEach((obstacle) => pushValidObstacle(game, obstacle));
   pushManyPathingObstacle(game, game.obstacles);
   pushManyLightingObstacles(game, game.obstacles);
 };

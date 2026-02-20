@@ -2,19 +2,19 @@ export const newMouse = (game, menu) => {
   const { playerRadius, mapWidth, mapHeight } = game;
   const canvas = document.getElementById("Game");
   const mouse = [0, 0];
-  const maxX = mapWidth - playerRadius;
-  const maxY = mapHeight - playerRadius;
+  const maxX = mapWidth - playerRadius - 1;
+  const maxY = mapHeight - playerRadius - 1;
 
   const handleMove = (e) => {
     if (menu.open) return;
     if (game.isDead) document.removeEventListener("mousemove", handleMove);
     const rect = canvas.getBoundingClientRect();
     mouse[0] = e.clientX - rect.left;
-    if (mouse[0] < playerRadius) mouse[0] = playerRadius;
+    if (mouse[0] < playerRadius) mouse[0] = playerRadius + 1;
     if (mouse[0] > maxX) mouse[0] = maxX;
     if (game.xSwap) mouse[0] = game.mapWidth - mouse[0];
     mouse[1] = rect.bottom - e.clientY;
-    if (mouse[1] < playerRadius) mouse[1] = playerRadius;
+    if (mouse[1] < playerRadius) mouse[1] = playerRadius + 1;
     if (mouse[1] > maxY) mouse[1] = maxY;
 
     const { w, a, s, d } = game.keyboard;

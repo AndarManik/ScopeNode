@@ -31,7 +31,7 @@ export const newGame = (app, options, team1, team2) => {
   game.spawn2 = [game.mapWidth - 2 * game.playerRadius, game.mapHeight / 2];
 
   if (!game.isMultiPlayer) {
-    team1 = new Set(["player", "t1"]);
+    team1 = new Set(["player"]);
     team2 = new Set(["o1", "o2"]);
     game.bots = [];
   }
@@ -52,7 +52,7 @@ export const newGame = (app, options, team1, team2) => {
 
     if (game.isMultiPlayer) return;
 
-    game.playerIsDead = true;
+    //game.playerIsDead = true;
     game.bots.length = 0;
 
     for (const uuid of team1)
@@ -67,6 +67,8 @@ export const newGame = (app, options, team1, team2) => {
         uuid,
         position: [...game.spawn2],
       });
+
+    if (!game.bots.length) game.noBots = true;
 
     game.startTime = performance.now();
     game.shots = new Set();
@@ -84,7 +86,12 @@ export const newGame = (app, options, team1, team2) => {
       initializeObstacles(game, () =>
         app.socket.json({
           command: "obstacles",
-          obstacles: [game.obstacles, game.obstacleBlockers],
+          obstacles: {
+            obstacles: game.obstacles,
+            blockers: game.obstacleBlockers,
+            team1Objective: game.team1Objective,
+            team2Objective: game.team2Objective,
+          },
         }),
       );
     };
@@ -240,21 +247,21 @@ const parseGameOptions = (app, game, options) => {
     case "small":
       game.playerRadius = 16;
       game.moveSpeed = 6.5;
-      game.obstacleArea = 12;
-      game.obstacleStartCount = 15;
+      game.obstacleArea = 7;
+      game.obstacleStartCount = 12;
       break;
 
     case "medium":
       game.playerRadius = 12;
       game.moveSpeed = 6.5;
-      game.obstacleArea = 12;
-      game.obstacleStartCount = 30;
+      game.obstacleArea = 7;
+      game.obstacleStartCount = 20;
       break;
     case "large":
       game.playerRadius = 8;
       game.moveSpeed = 6.5;
-      game.obstacleArea = 12;
-      game.obstacleStartCount = 65;
+      game.obstacleArea = 7;
+      game.obstacleStartCount = 36;
       break;
   }
 };

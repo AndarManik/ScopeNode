@@ -72,6 +72,47 @@ export function newKickoutParams(mPolygons, eps = DEFAULT_EPS) {
   return { eps, polys, aabbs, ccw, nVerts };
 }
 
+/**
+ * Accepts:
+ *  - [[x,y], ...]  OR  [ [[x,y], ...] ]
+ * Converts to numbers, ensures open, returns array-of-polygons.
+ * NOTE: only used in newKickoutParams().
+ */
+function normalizePolygonsOnce(multiPoly, eps) {
+  const out = new Array(multiPoly.length);
+
+  for (let i = 0; i < multiPoly.length; i++) {
+    const entry = multiPoly[i];
+
+    // entry is [ [[x,y],... ] ] form
+    if (
+      Array.isArray(entry) &&
+      entry.length === 1 &&
+      Array.isArray(entry[0]) &&
+      Array.isArray(entry[0][0])
+    ) {
+      const poly0 = entry[0];
+      const poly = new Array(poly0.length);
+      for (let k = 0; k < poly0.length; k++) {
+        const v = poly0[k];
+        poly[k] = [Number(v[0]), Number(v[1])];
+      }
+      out[i] = ensureOpen(poly, eps);
+      continue;
+    }
+
+    // entry is [[x,y], ...]
+    const poly = new Array(entry.length);
+    for (let k = 0; k < entry.length; k++) {
+      const v = entry[k];
+      poly[k] = [Number(v[0]), Number(v[1])];
+    }
+    out[i] = ensureOpen(poly, eps);
+  }
+
+  return out;
+}
+
 // ---------------------------------------------
 // Public: hot-loop kickout using params
 // ---------------------------------------------
@@ -673,10 +714,6 @@ export function kickout(p, K, p0 = null) {
   return [px - 1e-3, py];
 }
 
-// ---------------------------------------------
-// Exports kept for compatibility (non-hot usage)
-// ---------------------------------------------
-
 export function orient(ax, ay, bx, by, cx, cy) {
   return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
 }
@@ -704,88 +741,4 @@ export function onSegment(ax, ay, bx, by, px, py, eps = DEFAULT_EPS) {
     Math.min(ay, by) - eps <= py &&
     py <= Math.max(ay, by) + eps
   );
-}
-
-/**
- * Compatibility: pointInPolygon(p, poly, eps, polyAABBOpt)
- * For hot-loop kickout() we inline a version to reduce calls.
- */
-export function pointInPolygon(p, poly, eps = DEFAULT_EPS, polyAABBOpt = null) {
-  const px = p[0];
-  const py = p[1];
-
-  if (polyAABBOpt) {
-    if (
-      px < polyAABBOpt.minX - eps ||
-      px > polyAABBOpt.maxX + eps ||
-      py < polyAABBOpt.minY - eps ||
-      py > polyAABBOpt.maxY + eps
-    ) {
-      return false;
-    }
-  }
-
-  let inside = false;
-  const n = poly.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
-    const xi = poly[i][0];
-    const yi = poly[i][1];
-    const xj = poly[j][0];
-    const yj = poly[j][1];
-
-    if (onSegment(xj, yj, xi, yi, px, py, eps)) return true;
-
-    const yiGt = yi > py;
-    const yjGt = yj > py;
-    if (yiGt !== yjGt) {
-      const xInt = ((xj - xi) * (py - yi)) / (yj - yi) + xi;
-      if (px < xInt) inside = !inside;
-    }
-  }
-  return inside;
-}
-
-// ---------------------------------------------
-// Internal: normalize once for params creation
-// ---------------------------------------------
-
-/**
- * Accepts:
- *  - [[x,y], ...]  OR  [ [[x,y], ...] ]
- * Converts to numbers, ensures open, returns array-of-polygons.
- * NOTE: only used in newKickoutParams().
- */
-function normalizePolygonsOnce(multiPoly, eps) {
-  const out = new Array(multiPoly.length);
-
-  for (let i = 0; i < multiPoly.length; i++) {
-    const entry = multiPoly[i];
-
-    // entry is [ [[x,y],... ] ] form
-    if (
-      Array.isArray(entry) &&
-      entry.length === 1 &&
-      Array.isArray(entry[0]) &&
-      Array.isArray(entry[0][0])
-    ) {
-      const poly0 = entry[0];
-      const poly = new Array(poly0.length);
-      for (let k = 0; k < poly0.length; k++) {
-        const v = poly0[k];
-        poly[k] = [Number(v[0]), Number(v[1])];
-      }
-      out[i] = ensureOpen(poly, eps);
-      continue;
-    }
-
-    // entry is [[x,y], ...]
-    const poly = new Array(entry.length);
-    for (let k = 0; k < entry.length; k++) {
-      const v = entry[k];
-      poly[k] = [Number(v[0]), Number(v[1])];
-    }
-    out[i] = ensureOpen(poly, eps);
-  }
-
-  return out;
 }

@@ -1,5 +1,5 @@
 const app = document.getElementById("App");
-const maxTilt = 0.5; // degrees — mouse-driven tilt cap
+const maxTilt = 1; // degrees — mouse-driven tilt cap
 let currentTiltX = 0;
 let currentTiltY = 0;
 let targetTiltX = 0;
@@ -21,7 +21,7 @@ let jabTiltY = 0;
 export function jiggleApp(
   duration = 500,
   magnitude = 4,
-  tiltMagnitude = 0.6 // NEW: degrees
+  tiltMagnitude = 0.6, // NEW: degrees
 ) {
   const start = performance.now();
   const seed = Math.random() * 1000;
@@ -61,7 +61,7 @@ export function jabApp(
   direction,
   duration = 1000,
   magnitude = 20,
-  tiltMagnitude = 3
+  tiltMagnitude = 3,
 ) {
   const start = performance.now();
 
@@ -98,6 +98,10 @@ export function jabApp(
 
 const clamp = (v, min, max) => (v < min ? min : v > max ? max : v);
 
+function signedSqrt(x) {
+  return Math.sign(x) * x * x;
+}
+
 window.addEventListener("mousemove", (e) => {
   const rect = app.getBoundingClientRect();
 
@@ -106,6 +110,9 @@ window.addEventListener("mousemove", (e) => {
 
   nx = clamp(nx, -1, 1);
   ny = clamp(ny, -1, 1);
+
+  nx = signedSqrt(nx);
+  ny = signedSqrt(ny);
 
   targetTiltX = -(ny * maxTilt);
   targetTiltY = nx * maxTilt;

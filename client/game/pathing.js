@@ -17,7 +17,9 @@ export const pushManyPathingObstacle = (game, obstacles) => {
   game.pathGraph = new LightGraph(game);
   game.pathTotal.forEach(([poly]) => game.pathGraph.pushPolygon(poly));
 
-  game.apsp = makeLazyAPSP(game.pathGraph);
+  const lazyAPSP = makeLazyAPSP(game.pathGraph);
+  game.apsp = lazyAPSP.query;
+  game.apspGetEntry = lazyAPSP.dijkstraFrom;
   game.kickoutParams = newKickoutParams(game.obstacleTotal);
 };
 
@@ -34,11 +36,11 @@ export const planPath = (game, source, target) => {
   const targetVerts = game.pathGraph.visibleIndicesAt(target);
   const targetPointPoly = game.pathGraph.pointPolyAt(target, targetVerts);
 
+  let minDistance = Number.MAX_VALUE;
+
   if (!pointInClosedPolygonInclusive(source[0], source[1], targetPointPoly)) {
     const sourceVerts = game.pathGraph.visibleIndicesAt(source);
     const vertices = game.pathGraph.vertices;
-
-    let minDistance = Number.MAX_VALUE;
 
     for (const sIdx of sourceVerts) {
       const sx = vertices[sIdx][0] - source[0];
@@ -65,25 +67,27 @@ export const planPath = (game, source, target) => {
     }
   }
 
-  return [source, ...targetPath, target];
+  if (!isFinite(minDistance))
+    minDistance = Math.hypot(source[0] - target[0], source[1] - target[1]);
+
+  return { path: [source, ...targetPath, target], distance: minDistance };
 };
 
-export const planPathSafe = (game, source, target, avoid) => {
-  if (!game.kickoutParams) {
-    return { path: [], distance: 0 };
-  }
+export const planPathSafe = (game, source, target, avoidASPS) => {
+  if (!game.kickoutParams) return { path: [], distance: 0 };
 
   const { playerRadius } = game;
+  const { query, segmentDistanceToPolys, pointDistanceToPolys } = avoidASPS;
 
   source = kickout(source, game.kickoutParams);
   target = kickout(target, game.kickoutParams);
 
-  const fallBackClosest = avoid([source, target]);
+  const fallBackClosest = segmentDistanceToPolys(...source, ...target);
   const fallBackPath = fallBackClosest < playerRadius ? [] : [source, target];
 
   const straightDistance = Math.hypot(
     target[0] - source[0],
-    target[1] - source[1]
+    target[1] - source[1],
   );
   const fallBackDistance = fallBackPath.length ? straightDistance : Infinity;
   const fallBack = { path: fallBackPath, distance: fallBackDistance };
@@ -106,12 +110,16 @@ export const planPathSafe = (game, source, target, avoid) => {
     const sy = vertices[sIdx][1] - source[1];
     const sDist = Math.hypot(sx, sy);
 
+    if (segmentDistanceToPolys(sx, sy, ...source) < playerRadius) continue;
+
     for (const tIdx of targetVerts) {
       const tx = vertices[tIdx][0] - target[0];
       const ty = vertices[tIdx][1] - target[1];
       const tDist = Math.hypot(tx, ty);
 
-      const result = game.apsp(sIdx, tIdx);
+      if (segmentDistanceToPolys(tx, ty, ...target) < playerRadius) continue;
+
+      const result = query(sIdx, tIdx);
       if (!result) continue;
 
       const { path, distance } = result;
@@ -130,10 +138,7 @@ export const planPathSafe = (game, source, target, avoid) => {
 
   candidates.sort((a, b) => a.distance - b.distance);
 
-  for (const candidate of candidates)
-    if (avoid(candidate.path) >= playerRadius) return candidate;
-
-  return fallBack;
+  return candidates[0];
 };
 
 export const moveAlongPath = (position, path, step) => {
@@ -167,162 +172,6 @@ export const moveAlongPath = (position, path, step) => {
   }
   path.unshift([...position]);
 };
-
-/**
- * Build a lazy all-pairs shortest path query over a weighted graph.
- * Weights default to Euclidean distance between vertex coordinates.
- *
- * @param {{ vertices: Array<[number,number]>, edges: number[][] }} graph
- * @param {(uIdx:number, vIdx:number, u:[number,number], v:[number,number])=>number} [weightFn]
- * @returns {(source:number, target:number)=>{distance:number, path:Array<[number,number]>}}
- *
- * Conventions:
- * - edges[i] is a list of neighbor indices for vertex i (directed or undirected).
- * - If (source===target), distance = 0 and path = [vertices[source]].
- * - If unreachable, distance = Infinity and path = [].
- * - Returns paths as a list of vertex *coordinates* (not indices).
- */
-function makeLazyAPSP(graph, weightFn) {
-  const { vertices, edges } = graph;
-  const n = vertices.length;
-
-  if (!Array.isArray(vertices) || !Array.isArray(edges) || edges.length !== n) {
-    throw new Error("Invalid graph: vertices/edges mismatch.");
-  }
-
-  // Default weight: Euclidean distance between coordinates
-  const w =
-    typeof weightFn === "function"
-      ? weightFn
-      : (uIdx, vIdx, u, v) => {
-          const dx = u[0] - v[0];
-          const dy = u[1] - v[1];
-          return Math.hypot(dx, dy);
-        };
-
-  // Cache: source -> { dist: Float64Array, prev: Int32Array }
-  const cache = new Map();
-
-  // Minimal binary heap for Dijkstra
-  class MinHeap {
-    constructor() {
-      this.a = [];
-    }
-    size() {
-      return this.a.length;
-    }
-    push(item) {
-      this.a.push(item);
-      this._siftUp(this.a.length - 1);
-    }
-    pop() {
-      if (this.a.length === 0) return undefined;
-      const top = this.a[0];
-      const last = this.a.pop();
-      if (this.a.length) {
-        this.a[0] = last;
-        this._siftDown(0);
-      }
-      return top;
-    }
-    _siftUp(i) {
-      const a = this.a;
-      while (i > 0) {
-        const p = (i - 1) >> 1;
-        if (a[p].key <= a[i].key) break;
-        [a[p], a[i]] = [a[i], a[p]];
-        i = p;
-      }
-    }
-    _siftDown(i) {
-      const a = this.a;
-      const n = a.length;
-      while (true) {
-        let l = i * 2 + 1,
-          r = l + 1,
-          s = i;
-        if (l < n && a[l].key < a[s].key) s = l;
-        if (r < n && a[r].key < a[s].key) s = r;
-        if (s === i) break;
-        [a[s], a[i]] = [a[i], a[s]];
-        i = s;
-      }
-    }
-  }
-
-  function dijkstraFrom(source) {
-    const dist = new Float64Array(n);
-    const prev = new Int32Array(n);
-    for (let i = 0; i < n; i++) {
-      dist[i] = Infinity;
-      prev[i] = -1;
-    }
-
-    dist[source] = 0;
-    const pq = new MinHeap();
-    pq.push({ key: 0, v: source });
-
-    while (pq.size() > 0) {
-      const { key: d, v: uIdx } = pq.pop();
-      if (d !== dist[uIdx]) continue; // stale entry
-      const u = vertices[uIdx];
-
-      const nbrs = edges[uIdx] || [];
-      for (let k = 0; k < nbrs.length; k++) {
-        const vIdx = nbrs[k];
-        if (vIdx < 0 || vIdx >= n) continue; // ignore invalid neighbor indices
-        const v = vertices[vIdx];
-        const wt = w(uIdx, vIdx, u, v);
-        if (wt < 0)
-          throw new Error(
-            "Negative edge weight encountered; Dijkstra requires nonnegative weights."
-          );
-        const alt = d + wt;
-        if (alt < dist[vIdx]) {
-          dist[vIdx] = alt;
-          prev[vIdx] = uIdx;
-          pq.push({ key: alt, v: vIdx });
-        }
-      }
-    }
-
-    cache.set(source, { dist, prev });
-    return { dist, prev };
-  }
-
-  function reconstructPath(prev, source, target) {
-    if (source === target) return [vertices[source]];
-    const pathIdx = [];
-    for (let v = target; v !== -1; v = prev[v]) pathIdx.push(v);
-    if (pathIdx[pathIdx.length - 1] !== source) return []; // unreachable
-    pathIdx.reverse();
-    return pathIdx.map((i) => vertices[i]);
-  }
-
-  return function query(source, target) {
-    // Basic validations
-    if (
-      !Number.isInteger(source) ||
-      !Number.isInteger(target) ||
-      source < 0 ||
-      target < 0 ||
-      source >= n ||
-      target >= n
-    ) {
-      throw new Error("source/target out of range.");
-    }
-
-    if (source === target) return { distance: 0, path: [vertices[source]] };
-
-    const entry = cache.get(source) || dijkstraFrom(source);
-    const { dist, prev } = entry;
-    const distance = dist[target];
-    if (!Number.isFinite(distance)) return { distance: Infinity, path: [] };
-
-    const path = reconstructPath(prev, source, target);
-    return { distance, path };
-  };
-}
 
 const EPS = 1e-9;
 function pointOnSegment(px, py, ax, ay, bx, by) {
@@ -359,7 +208,6 @@ function closestPointOnSegment(px, py, ax, ay, bx, by) {
 
   return [ax + t * abx, ay + t * aby];
 }
-
 
 export function makeDistancePathToPolys(polys) {
   // polys: same shape as before => array of [poly0, bodyPolys, ...]
@@ -458,14 +306,14 @@ export function makeDistancePathToPolys(polys) {
             px < poly.minX
               ? poly.minX - px
               : px > poly.maxX
-              ? px - poly.maxX
-              : 0;
+                ? px - poly.maxX
+                : 0;
           const dy =
             py < poly.minY
               ? poly.minY - py
               : py > poly.maxY
-              ? py - poly.maxY
-              : 0;
+                ? py - poly.maxY
+                : 0;
           const aabbD2 = dx * dx + dy * dy;
           if (aabbD2 >= bestD2) continue;
         }
@@ -640,4 +488,573 @@ function segmentsIntersectInclusive(ax, ay, bx, by, cx, cy, dx, dy) {
   if (o4 === 0 && pointOnSegment(bx, by, cx, cy, dx, dy)) return true;
 
   return false;
+}
+
+function makeLazyAPSP(graph) {
+  const { vertices, edges } = graph;
+  const n = vertices.length;
+
+  if (!Array.isArray(vertices) || !Array.isArray(edges) || edges.length !== n)
+    throw new Error("Invalid graph: vertices/edges mismatch.");
+
+  const cache = new Map();
+
+  function dijkstraFrom(source) {
+    const entry = cache.get(source);
+    if (entry) return entry;
+
+    const dist = new Float64Array(n);
+    const prev = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      dist[i] = Infinity;
+      prev[i] = -1;
+    }
+
+    dist[source] = 0;
+    const pq = new MinHeap();
+    pq.push({ key: 0, v: source });
+
+    while (pq.size() > 0) {
+      const { key: d, v: uIdx } = pq.pop();
+      if (d !== dist[uIdx]) continue; // stale entry
+      const u = vertices[uIdx];
+
+      const nbrs = edges[uIdx] || [];
+      for (let k = 0; k < nbrs.length; k++) {
+        const vIdx = nbrs[k];
+        if (vIdx < 0 || vIdx >= n) continue; // ignore invalid neighbor indices
+        const v = vertices[vIdx];
+        const dx = u[0] - v[0];
+        const dy = u[1] - v[1];
+        const wt = Math.hypot(dx, dy);
+        const alt = d + wt;
+        if (alt < dist[vIdx]) {
+          dist[vIdx] = alt;
+          prev[vIdx] = uIdx;
+          pq.push({ key: alt, v: vIdx });
+        }
+      }
+    }
+
+    cache.set(source, { dist, prev });
+    return { dist, prev };
+  }
+
+  function reconstructPath(prev, source, target) {
+    if (source === target) return [vertices[source]];
+    const pathIdx = [];
+    for (let v = target; v !== -1; v = prev[v]) pathIdx.push(v);
+    if (pathIdx[pathIdx.length - 1] !== source) return []; // unreachable
+    pathIdx.reverse();
+    return pathIdx.map((i) => vertices[i]);
+  }
+
+  function query(source, target) {
+    const isNumber = Number.isInteger(source) && Number.isInteger(target);
+    const isNonNegative = isNumber && source >= 0 && target >= 0;
+    const inRange = isNonNegative && source < n && target < n;
+    if (!inRange)
+      throw new Error("safeGraphQuery: source/target out of range.");
+
+    if (source === target) return { distance: 0, path: [vertices[source]] };
+
+    const { dist, prev } = dijkstraFrom(source);
+    const distance = dist[target];
+    if (!Number.isFinite(distance)) return { distance: Infinity, path: [] };
+    const path = reconstructPath(prev, source, target);
+    return { distance, path };
+  }
+
+  return { query, dijkstraFrom };
+}
+
+/**
+ * Build a *safe* shortest-path query over game.pathGraph, given avoid polys.
+ *
+ * OPTIMIZATIONS INCLUDED:
+ * 1) Lazy vertex legality cache (vertexLegal + pointDistanceToPolys)
+ * 2) Constrained search uses A* with an admissible heuristic from unconstrained APSP
+ *    - requires: game.apspGetEntry(targetIdx).dist (dist-from-target array), OR falls back to Euclid-to-target
+ * 3) Optional best-so-far bound from prefix/suffix stitching of unconstrained APSP path (prunes A*)
+ *
+ * Returns: { query, segmentDistanceToPolys, pointDistanceToPolys }
+ */
+export function makeSafeGraphQueryFromPolys(game, polys) {
+  const r = +game.playerRadius || 0;
+  const graph = game.pathGraph;
+  if (!graph || !Array.isArray(graph.vertices) || !Array.isArray(graph.edges))
+    throw new Error("makeSafeGraphQueryFromPolys: game.pathGraph invalid.");
+
+  const { vertices, edges } = graph;
+  const n = vertices.length;
+
+  const EPS = 1e-9;
+
+  // --- Bake polys (same structure as makeDistancePathToPolys) ---
+  // Each poly: { xs, ys, edges:[{ax,ay,bx,by}], minX,maxX,minY,maxY }
+  const prePolys = [];
+  if (polys && polys.length) {
+    for (let p = 0; p < polys.length; p++) {
+      const entry = polys[p];
+      if (!entry) continue;
+      const poly = entry[0];
+      if (!poly || poly.length < 4) continue;
+
+      const m = poly.length;
+      const xs = new Float64Array(m);
+      const ys = new Float64Array(m);
+
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+
+      for (let i = 0; i < m; i++) {
+        const x = +poly[i][0];
+        const y = +poly[i][1];
+        xs[i] = x;
+        ys[i] = y;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+
+      const e = new Array(m - 1);
+      for (let i = 0; i < m - 1; i++) {
+        const ax = xs[i],
+          ay = ys[i];
+        const bx = xs[i + 1],
+          by = ys[i + 1];
+        e[i] = { ax, ay, bx, by };
+      }
+
+      prePolys.push({ xs, ys, edges: e, minX, maxX, minY, maxY });
+    }
+  }
+
+  // --- Virtual culling cache ---
+  // edgeKey(u,v) -> boolean ok
+
+  const edgeOk = new Map();
+
+  const vertexLegal = [];
+  const refToIdx = new Map();
+  for (let i = 0; i < n; i++) {
+    const p = vertices[i];
+    vertexLegal[i] = pointDistanceToPolys(p[0], p[1]) >= r;
+    refToIdx.set(p, i);
+  }
+
+  // ---------- Geometry helpers ----------
+
+  function pointOnSegment(px, py, ax, ay, bx, by) {
+    const abx = bx - ax,
+      aby = by - ay;
+    const apx = px - ax,
+      apy = py - ay;
+
+    const cross = abx * apy - aby * apx;
+    if (cross < -EPS || cross > EPS) return false;
+
+    const dot = apx * abx + apy * aby;
+    if (dot < -EPS) return false;
+
+    const ab2 = abx * abx + aby * aby;
+    if (dot > ab2 + EPS) return false;
+
+    return true;
+  }
+
+  function closestPointOnSegment(px, py, ax, ay, bx, by) {
+    const abx = bx - ax,
+      aby = by - ay;
+    const apx = px - ax,
+      apy = py - ay;
+    const ab2 = abx * abx + aby * aby;
+    if (ab2 === 0) return [ax, ay];
+
+    let t = (apx * abx + apy * aby) / ab2;
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+    return [ax + t * abx, ay + t * aby];
+  }
+
+  function orient(ax, ay, bx, by, cx, cy) {
+    const v = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+    if (v > EPS) return 1;
+    if (v < -EPS) return -1;
+    return 0;
+  }
+
+  function segmentsIntersectInclusive(ax, ay, bx, by, cx, cy, dx, dy) {
+    const o1 = orient(ax, ay, bx, by, cx, cy);
+    const o2 = orient(ax, ay, bx, by, dx, dy);
+    const o3 = orient(cx, cy, dx, dy, ax, ay);
+    const o4 = orient(cx, cy, dx, dy, bx, by);
+
+    if (o1 * o2 < 0 && o3 * o4 < 0) return true;
+    if (o1 === 0 && pointOnSegment(cx, cy, ax, ay, bx, by)) return true;
+    if (o2 === 0 && pointOnSegment(dx, dy, ax, ay, bx, by)) return true;
+    if (o3 === 0 && pointOnSegment(ax, ay, cx, cy, dx, dy)) return true;
+    if (o4 === 0 && pointOnSegment(bx, by, cx, cy, dx, dy)) return true;
+    return false;
+  }
+
+  function pointInClosedPolygonInclusivePre(px, py, poly) {
+    // On-boundary check
+    for (let i = 0; i < poly.edges.length; i++) {
+      const e = poly.edges[i];
+      if (pointOnSegment(px, py, e.ax, e.ay, e.bx, e.by)) return true;
+    }
+
+    // Ray cast
+    const { xs, ys } = poly;
+    const m = xs.length;
+    let inside = false;
+    for (let i = 0, j = m - 2; i < m - 1; j = i++) {
+      const xi = xs[i],
+        yi = ys[i];
+      const xj = xs[j],
+        yj = ys[j];
+      const intersects = yi > py !== yj > py;
+      if (!intersects) continue;
+      const xAtY = xj + ((py - yj) * (xi - xj)) / (yi - yj);
+      if (xAtY > px) inside = !inside;
+    }
+    return inside;
+  }
+
+  /**
+   * Minimum distance between segment AB and the union of polygons.
+   * Returns 0 if AB intersects/touches or either endpoint is inside/on boundary.
+   */
+  function segmentDistanceToPolys(ax, ay, bx, by) {
+    if (prePolys.length === 0) return Infinity;
+
+    // Endpoint-in-poly early exit
+    for (let k = 0; k < prePolys.length; k++) {
+      const poly = prePolys[k];
+
+      if (
+        ax >= poly.minX &&
+        ax <= poly.maxX &&
+        ay >= poly.minY &&
+        ay <= poly.maxY &&
+        pointInClosedPolygonInclusivePre(ax, ay, poly)
+      ) {
+        return 0;
+      }
+      if (
+        bx >= poly.minX &&
+        bx <= poly.maxX &&
+        by >= poly.minY &&
+        by <= poly.maxY &&
+        pointInClosedPolygonInclusivePre(bx, by, poly)
+      ) {
+        return 0;
+      }
+    }
+
+    let bestD2 = Infinity;
+
+    const segMinX = ax < bx ? ax : bx;
+    const segMaxX = ax > bx ? ax : bx;
+    const segMinY = ay < by ? ay : by;
+    const segMaxY = ay > by ? ay : by;
+
+    for (let k = 0; k < prePolys.length; k++) {
+      const poly = prePolys[k];
+
+      // Segment bbox vs poly bbox cull
+      if (
+        segMaxX < poly.minX ||
+        segMinX > poly.maxX ||
+        segMaxY < poly.minY ||
+        segMinY > poly.maxY
+      ) {
+        continue;
+      }
+
+      const pe = poly.edges;
+      for (let j = 0; j < pe.length; j++) {
+        const e = pe[j];
+        const cx = e.ax,
+          cy = e.ay;
+        const dx = e.bx,
+          dy = e.by;
+
+        if (segmentsIntersectInclusive(ax, ay, bx, by, cx, cy, dx, dy))
+          return 0;
+
+        // A -> CD
+        let q = closestPointOnSegment(ax, ay, cx, cy, dx, dy);
+        let ddx = q[0] - ax,
+          ddy = q[1] - ay;
+        let d2 = ddx * ddx + ddy * ddy;
+        if (d2 < bestD2) bestD2 = d2;
+
+        // B -> CD
+        q = closestPointOnSegment(bx, by, cx, cy, dx, dy);
+        ddx = q[0] - bx;
+        ddy = q[1] - by;
+        d2 = ddx * ddx + ddy * ddy;
+        if (d2 < bestD2) bestD2 = d2;
+
+        // C -> AB
+        q = closestPointOnSegment(cx, cy, ax, ay, bx, by);
+        ddx = q[0] - cx;
+        ddy = q[1] - cy;
+        d2 = ddx * ddx + ddy * ddy;
+        if (d2 < bestD2) bestD2 = d2;
+
+        // D -> AB
+        q = closestPointOnSegment(dx, dy, ax, ay, bx, by);
+        ddx = q[0] - dx;
+        ddy = q[1] - dy;
+        d2 = ddx * ddx + ddy * ddy;
+        if (d2 < bestD2) bestD2 = d2;
+
+        if (bestD2 === 0) return 0;
+      }
+    }
+
+    return bestD2 === Infinity ? Infinity : Math.sqrt(bestD2);
+  }
+
+  function pointDistanceToPolys(px, py) {
+    if (prePolys.length === 0) return Infinity;
+
+    // inside/on-boundary early exit
+    for (let k = 0; k < prePolys.length; k++) {
+      const poly = prePolys[k];
+      if (
+        px >= poly.minX &&
+        px <= poly.maxX &&
+        py >= poly.minY &&
+        py <= poly.maxY &&
+        pointInClosedPolygonInclusivePre(px, py, poly)
+      ) {
+        return 0;
+      }
+    }
+
+    let bestD2 = Infinity;
+
+    // NOTE: do NOT bbox-cull here by requiring (px,py) be within poly bbox.
+    // Closest point to a poly can be outside its bbox; the bbox is still useful for a *lower bound*,
+    // but your original pointDistanceToPolys incorrectly skipped polys whose bbox doesn't contain the point.
+    // We'll do a cheap lower-bound check instead:
+    for (let k = 0; k < prePolys.length; k++) {
+      const poly = prePolys[k];
+
+      // Lower bound from AABB distance
+      let dx = 0;
+      if (px < poly.minX) dx = poly.minX - px;
+      else if (px > poly.maxX) dx = px - poly.maxX;
+
+      let dy = 0;
+      if (py < poly.minY) dy = poly.minY - py;
+      else if (py > poly.maxY) dy = py - poly.maxY;
+
+      const lb2 = dx * dx + dy * dy;
+      if (lb2 >= bestD2) continue;
+
+      const pe = poly.edges;
+      for (let j = 0; j < pe.length; j++) {
+        const e = pe[j];
+        const q = closestPointOnSegment(px, py, e.ax, e.ay, e.bx, e.by);
+        const ddx = q[0] - px,
+          ddy = q[1] - py;
+        const d2 = ddx * ddx + ddy * ddy;
+        if (d2 < bestD2) bestD2 = d2;
+        if (bestD2 === 0) return 0;
+      }
+    }
+
+    return bestD2 === Infinity ? Infinity : Math.sqrt(bestD2);
+  }
+
+  function isEdgeLegal(u, v) {
+    const key = u > v ? u * n + v : u + v * n;
+    const cached = edgeOk.get(key);
+    if (cached !== undefined) return cached;
+
+    // cheap cull: if either endpoint is illegal, edge is illegal
+    if (!vertexLegal[u] || !vertexLegal[v]) {
+      edgeOk.set(key, false);
+      return false;
+    }
+
+    const a = vertices[u];
+    const b = vertices[v];
+    const d = segmentDistanceToPolys(a[0], a[1], b[0], b[1]);
+    const ok = d >= r;
+    edgeOk.set(key, ok);
+    return ok;
+  }
+
+  function pathIsLegalByEdges(pathCoords) {
+    if (!pathCoords || pathCoords.length <= 1) return true;
+    for (let i = 0; i < pathCoords.length; i++) {
+      const u = refToIdx.get(pathCoords[i]);
+      if (u !== undefined && !vertexLegal[u]) return false;
+    }
+    for (let i = 0; i < pathCoords.length - 1; i++) {
+      const u = refToIdx.get(pathCoords[i]);
+      const v = refToIdx.get(pathCoords[i + 1]);
+      if (u === undefined || v === undefined) {
+        const a = pathCoords[i];
+        const b = pathCoords[i + 1];
+        if (segmentDistanceToPolys(a[0], a[1], b[0], b[1]) < r) return false;
+      } else {
+        if (!isEdgeLegal(u, v)) return false;
+      }
+    }
+    return true;
+  }
+
+  function reconstructIdxPath(prev, s, t) {
+    if (s === t) return [s];
+    const out = [];
+    for (let v = t; v !== -1; v = prev[v]) out.push(v);
+    if (out[out.length - 1] !== s) return [];
+    out.reverse();
+    return out;
+  }
+
+  function constrainedAStar(sourceIdx, targetIdx) {
+    const hDist = game.apspGetEntry(targetIdx).dist;
+    const h0 = hDist[sourceIdx];
+
+    const verticesIllegal = !vertexLegal[sourceIdx] || !vertexLegal[targetIdx];
+    if (verticesIllegal || !Number.isFinite(h0))
+      return { distance: Infinity, path: [] };
+
+    const gScore = new Float64Array(n);
+    const fBest = new Float64Array(n);
+    const prev = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      gScore[i] = Infinity;
+      fBest[i] = Infinity;
+      prev[i] = -1;
+    }
+
+    gScore[sourceIdx] = 0;
+    fBest[sourceIdx] = h0;
+
+    const pq = new MinHeap();
+    pq.push({ key: h0, v: sourceIdx });
+
+    while (pq.size() > 0) {
+      const { key: f, v: u } = pq.pop();
+
+      // skip stale heap entries
+      if (f > fBest[u]) continue;
+
+      if (u === targetIdx) break;
+
+      const nbrs = edges[u];
+      if (!nbrs) continue;
+
+      const uPos = vertices[u];
+      const g = gScore[u]; // finite if reached via best-f
+
+      for (let k = 0; k < nbrs.length; k++) {
+        const v = nbrs[k];
+        if (v < 0 || v >= n) continue;
+
+        if (!vertexLegal[v]) continue;
+        if (!isEdgeLegal(u, v)) continue;
+
+        const hv = hDist[v];
+        if (!Number.isFinite(hv)) continue;
+
+        const vPos = vertices[v];
+        const w = Math.hypot(uPos[0] - vPos[0], uPos[1] - vPos[1]);
+        const alt = g + w;
+
+        const nf = alt + hv;
+
+        // only accept if strictly better
+        if (nf < fBest[v]) {
+          fBest[v] = nf;
+          gScore[v] = alt;
+          prev[v] = u;
+          pq.push({ key: nf, v });
+        }
+      }
+    }
+
+    const d = gScore[targetIdx];
+    if (!Number.isFinite(d)) return { distance: Infinity, path: [] };
+
+    const idxPath = reconstructIdxPath(prev, sourceIdx, targetIdx);
+    if (!idxPath.length) return { distance: Infinity, path: [] };
+
+    return { distance: d, path: idxPath.map((i) => vertices[i]) };
+  }
+
+  function query(sourceIdx, targetIdx) {
+    const isNumber = Number.isInteger(sourceIdx) && Number.isInteger(targetIdx);
+    const isNonNegative = isNumber && sourceIdx >= 0 && targetIdx >= 0;
+    const inRange = isNonNegative && sourceIdx < n && targetIdx < n;
+    if (!inRange)
+      throw new Error("safeGraphQuery: source/target out of range.");
+
+    if (sourceIdx === targetIdx)
+      return { distance: 0, path: [vertices[sourceIdx]] };
+
+    // hard early rejects via vertex legality
+    if (!vertexLegal[sourceIdx] || !vertexLegal[targetIdx])
+      return { distance: Infinity, path: [] };
+
+    const res = game.apsp(sourceIdx, targetIdx);
+    if (res.path.length && pathIsLegalByEdges(res.path)) return res;
+
+    return constrainedAStar(sourceIdx, targetIdx);
+  }
+
+  return { query, segmentDistanceToPolys, pointDistanceToPolys };
+}
+
+class MinHeap {
+  constructor() {
+    this.a = [];
+  }
+  size() {
+    return this.a.length;
+  }
+  push(item) {
+    const a = this.a;
+    a.push(item);
+    let i = a.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (a[p].key <= a[i].key) break;
+      [a[p], a[i]] = [a[i], a[p]];
+      i = p;
+    }
+  }
+  pop() {
+    const a = this.a;
+    if (!a.length) return undefined;
+    const top = a[0];
+    const last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      while (true) {
+        let l = i * 2 + 1,
+          r = l + 1,
+          s = i;
+        if (l < a.length && a[l].key < a[s].key) s = l;
+        if (r < a.length && a[r].key < a[s].key) s = r;
+        if (s === i) break;
+        [a[s], a[i]] = [a[i], a[s]];
+        i = s;
+      }
+    }
+    return top;
+  }
 }

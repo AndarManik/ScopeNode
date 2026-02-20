@@ -7,6 +7,7 @@ import {
 } from "./hitreg.js";
 import {
   makeDistancePathToPolys,
+  makeSafeGraphQueryFromPolys,
   moveAlongPath,
   planPath,
   planPathSafe,
@@ -53,37 +54,20 @@ const updateBotPositions = (game, team1, delta) => {
   game.team1Target = [...game.team1Lights.values()];
   game.team2Target = [...game.team2Lights.values()];
 
-  game.team1Distance = makeDistancePathToPolys(game.team1Target);
-  game.team2Distance = makeDistancePathToPolys(game.team2Target);
+  game.team1Distance = makeSafeGraphQueryFromPolys(game, game.team1Target);
+  game.team2Distance = makeSafeGraphQueryFromPolys(game, game.team2Target);
 
   game.team1Used = [];
   game.team2Used = [];
   for (const bot of game.bots) {
-    if (
-      !bot.last ||
-      !bot.path ||
-      bot.path.length <= 1 ||
-      bot.last + bot.var > 0.5
-    ) {
-      bot.last = 0;
-      bot.var = Math.random() * 0.2 - 0.1;
-      bot.path = null;
-    }
-
-    if (bot.path) {
-      team1.has(bot.uuid)
-        ? game.team1Used.push(bot.path[bot.path.length - 1])
-        : game.team2Used.push(bot.path[bot.path.length - 1]);
-    }
-
-    bot.last += delta;
+    bot.path = null;
   }
 
   for (const bot of game.bots) {
     const toObjective = objectiveLocation(game, team1, bot);
 
-    pathBotToTargets(game, team1, () => [toObjective], bot);
     pathBotToTargets(game, team1, allKillTargets, bot);
+    pathBotToTargets(game, team1, () => [toObjective], bot);
     pathBotToTargets(game, team1, allDieTargets, bot);
   }
 
@@ -201,6 +185,7 @@ const updateBotLights = (game, team1) => {
 };
 
 const updateSinglePlayerShots = (game, team1, delta) => {
+  if(game.noBots) return;
   const player = {
     uuid: "player",
     position: game.playerPosition,
@@ -286,7 +271,7 @@ const updatePlayerPosition = (game, delta) => {
   const moveSpeed = shiftSlow * ctrlSlow * game.moveSpeed;
   const step = moveSpeed * game.playerRadius * delta;
   const target = getPlayerPathTarget(game);
-  game.path = planPath(game, game.playerPosition, target);
+  game.path = planPath(game, game.playerPosition, target).path;
   if (!game.preRound) moveAlongPath(game.playerPosition, game.path, step);
 };
 

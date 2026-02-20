@@ -326,7 +326,7 @@ export const createTeamsVisionRenderer = (ctx, mapWidth, mapHeight, scale) => {
 
       gctx.globalCompositeOperation = "source-over";
 
-      ctx.globalCompositeOperation = "color-dodge";
+      ctx.globalCompositeOperation = "screen";
       ctx.drawImage(tint.canvas, 0, 0);
     }
 

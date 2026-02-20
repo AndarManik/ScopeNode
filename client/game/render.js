@@ -89,7 +89,7 @@ const renderBots = (game, team1) => {
         ? {
             glowRadius: playerRadius / 1.25,
             glowColor: glowColor,
-            composite: "color-dodge",
+            composite: "screen",
           }
         : null,
     );
@@ -283,7 +283,7 @@ const renderLocalPlayer = (game, isTeam1) => {
       ? {
           glowRadius: playerRadius / 1.25,
           glowColor: glowColor,
-          composite: "color-dodge",
+          composite: "screen",
         }
       : null,
   );
@@ -317,7 +317,7 @@ const renderGlobalPlayers = (game, team1) => {
         ? {
             glowRadius: playerRadius / 1.25,
             glowColor: glowColor,
-            composite: "color-dodge",
+            composite: "screen",
           }
         : null,
     );
@@ -350,14 +350,14 @@ const renderObjectiveIfNeeded = (
       ? {
           glowRadius: playerRadius / 1.25,
           glowColor: color.team1Objective,
-          composite: "color-dodge",
+          composite: "screen",
         }
       : null,
     renderSettings.glowEnabled
       ? {
           glowRadius: playerRadius / 1.25,
           glowColor: color.team2Objective,
-          composite: "color-dodge",
+          composite: "screen",
         }
       : null,
   );
@@ -393,7 +393,7 @@ const renderObstaclePreviewScene = (
 
   if (!renderSettings.glowEnabled || game.previewObstacle.index === -1)
     ctx.fillStyle = color.obstacleColorBrilliant(game.previewObstacle.index);
-  else ctx.fillStyle = color.background;
+  else ctx.fillStyle = color.backgroundBrilliant;
 
   ctx.beginPath();
   ctx.moveTo(poly[0][0], poly[0][1]);
@@ -467,7 +467,7 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
       ? {
           glowRadius: playerRadius / 1.25,
           glowColor: game.xSwap ? color.team2Disk : color.team1Disk,
-          composite: "color-dodge",
+          composite: "screen",
         }
       : null,
   );
@@ -497,7 +497,7 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
       ? {
           glowRadius: playerRadius / 1.25,
           glowColor: game.xSwap ? color.team1Disk : color.team2Disk,
-          composite: "color-dodge",
+          composite: "screen",
         }
       : null,
   );
@@ -533,7 +533,7 @@ const drawPreviewShots = (game, ctx, color, renderSettings) => {
           ? {
               glowRadius: playerRadius / 1.25,
               glowColor: killerGlowColor,
-              composite: "color-dodge",
+              composite: "screen",
             }
           : null,
       );
@@ -560,7 +560,7 @@ const drawPreviewShots = (game, ctx, color, renderSettings) => {
           ? {
               glowRadius: playerRadius / 1.25,
               glowColor: killedGlowColor,
-              composite: "color-dodge",
+              composite: "screen",
             }
           : null,
       );
@@ -618,7 +618,7 @@ const drawObstacles = (game, ctx, color) => {
         game.choosingObstacle || game.previewingObstacle
           ? color.obstacleColorBrilliant(colorIndex++)
           : color.obstacleColor(colorIndex++);
-    else ctx.fillStyle = color.background;
+    else ctx.fillStyle = color.backgroundBrilliant;
 
     ctx.beginPath();
 
