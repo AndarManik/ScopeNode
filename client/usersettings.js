@@ -18,7 +18,7 @@ export const addUserSettings = (app) => {
     playerRadius: defaultGet("game.playerRadius", 12),
     moveSpeed: defaultGet("game.moveSpeed", 6.5),
     obstacleArea: defaultGet("game.obstacleArea", 7),
-    obstacleStartCount: defaultGet("game.obstacleStartCount", 20),
+    obstacleStartCount: defaultGet("game.obstacleStartCount", 16),
   };
 
   rawSettings.render = {

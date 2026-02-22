@@ -39,7 +39,7 @@ export const settings = (app) => {
   };
 
   // convenience: standard label + number input row
-  const numberRowDef = (label, settings, name) => ({
+  const numberRowDef = (label, settings, name, map = (x) => x) => ({
     height: 1,
     create: (yBase) => {
       const elements = [];
@@ -50,14 +50,15 @@ export const settings = (app) => {
 
       const inputEl = menu.newEl(7, yBase, 9, 1, "input");
       inputEl.type = "number";
-      inputEl.value = settings[name];
+      inputEl.value = map(settings[name]);
       inputEl.style.backgroundColor = "var(--input)";
       elements.push(inputEl);
 
       inputEl.addEventListener("input", () => {
         const v = Number(inputEl.value);
         if (!Number.isFinite(v)) return;
-        settings[name] = v;
+        settings[name] = map(v);
+        inputEl.value = settings[name];
       });
 
       return elements;
@@ -148,7 +149,9 @@ export const settings = (app) => {
       jumpLabel: "Render",
       headerLabel: "Render Settings",
       rows: [
-        numberRowDef("Scale", settingsObj.render, "scale"),
+        numberRowDef("Scale", settingsObj.render, "scale", (value) =>
+          Math.min(3, Math.max(0.1, value)),
+        ),
         // Glow Enabled
         {
           height: 1,
@@ -273,7 +276,7 @@ export const settings = (app) => {
         numberRowDef(
           "Obstacle Start Count",
           settingsObj.game,
-          "obstacleStartCount"
+          "obstacleStartCount",
         ),
       ],
     },
@@ -423,7 +426,7 @@ export const settings = (app) => {
       const oldIndex = scrollRowIndex;
       scrollRowIndex = Math.min(
         maxScrollIndex,
-        Math.max(0, scrollRowIndex + delta)
+        Math.max(0, scrollRowIndex + delta),
       );
 
       if (scrollRowIndex !== oldIndex) {

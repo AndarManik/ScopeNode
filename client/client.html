@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <!-- =======================================================
@@ -158,7 +158,9 @@
         outline: none;
         cursor: pointer;
 
-        transition: background-color 0.15s ease, transform 0.15s ease;
+        transition:
+          background-color 0.15s ease,
+          transform 0.15s ease;
       }
 
       button:hover {
@@ -227,7 +229,8 @@
         transition: none;
         padding: 8px;
 
-        text-shadow: 0 0 8px color-mix(in srgb, var(--input) 60%, transparent),
+        text-shadow:
+          0 0 8px color-mix(in srgb, var(--input) 60%, transparent),
           0 0 16px color-mix(in srgb, var(--input) 50%, transparent),
           0 0 32px color-mix(in srgb, var(--input) 40%, transparent);
       }
@@ -279,7 +282,6 @@
       <div id="Menu"></div>
       <p id="Stats"></p>
     </div>
-
-    <script src="./app.js" type="module"></script>
   </body>
+  <script src="./app.js" type="module"></script>
 </html>

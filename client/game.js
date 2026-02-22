@@ -248,20 +248,20 @@ const parseGameOptions = (app, game, options) => {
       game.playerRadius = 16;
       game.moveSpeed = 6.5;
       game.obstacleArea = 7;
-      game.obstacleStartCount = 12;
+      game.obstacleStartCount = 8;
       break;
 
     case "medium":
       game.playerRadius = 12;
       game.moveSpeed = 6.5;
       game.obstacleArea = 7;
-      game.obstacleStartCount = 20;
+      game.obstacleStartCount = 16;
       break;
     case "large":
       game.playerRadius = 8;
       game.moveSpeed = 6.5;
       game.obstacleArea = 7;
-      game.obstacleStartCount = 36;
+      game.obstacleStartCount = 32;
       break;
   }
 };

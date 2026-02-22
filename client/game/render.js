@@ -68,7 +68,7 @@ const renderBots = (game, team1) => {
     const isTeam1 = team1.has(uuid);
 
     const target = state.target?.[0];
-    const hasAdvantage = state.target?.[1];
+    const hasAdvantage = state.advantage;
 
     const playerColor = isTeam1 ? color.team1Player : color.team2Player;
     const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
@@ -262,7 +262,7 @@ const renderLocalPlayer = (game, isTeam1) => {
   const { color, playerRadius, renderSettings, playerPosition } = game;
 
   const target = game.playerTarget?.[0];
-  const hasAdvantage = game.playerTarget?.[1];
+  const hasAdvantage = game.advantage;
 
   const playerColor = isTeam1 ? color.team1Player : color.team2Player;
   const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
@@ -296,7 +296,7 @@ const renderGlobalPlayers = (game, team1) => {
     const isTeam1 = team1.has(uuid);
 
     const target = state.target?.[0];
-    const hasAdvantage = state.target?.[1];
+    const hasAdvantage = state.advantage;
 
     const playerColor = isTeam1 ? color.team1Player : color.team2Player;
     const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
