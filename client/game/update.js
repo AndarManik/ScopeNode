@@ -82,10 +82,13 @@ const updateBotPositions = (game, team1, delta) => {
   }
 
   for (const bot of game.bots) {
-    const toObjective = objectiveLocation(game, team1, bot);
-
     pathBotToTargets(game, team1, allKillTargets, bot);
-    pathBotToTargets(game, team1, () => [toObjective], bot);
+    pathBotToTargets(
+      game,
+      team1,
+      () => [objectiveLocation(game, team1, bot)],
+      bot,
+    );
     pathBotToTargets(game, team1, allDieTargets, bot);
   }
 

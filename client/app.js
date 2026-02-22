@@ -14,3 +14,10 @@ app.socket = newSocket(app);
 app.menu = newMenu(app);
 app.game = newGame(app);
 main(app);
+
+window.addEventListener("error", (e) =>
+  console.error("Global error:", e.error || e.message),
+);
+window.addEventListener("unhandledrejection", (e) =>
+  console.error("Unhandled promise rejection:", e.reason),
+);

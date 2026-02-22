@@ -232,6 +232,8 @@ export const newGame = (app, options, team1, team2) => {
 
     app.socket.json({ command: "client ready" });
   } else {
+    game.choosingObstacle = true;
+
     game.handleMessage = () => {};
     game.updatePlayers = () => {};
   }
@@ -246,20 +248,20 @@ const parseGameOptions = (app, game, options) => {
   switch (options) {
     case "small":
       game.playerRadius = 16;
-      game.moveSpeed = 6.5;
+      game.moveSpeed = 13;
       game.obstacleArea = 7;
       game.obstacleStartCount = 8;
       break;
 
     case "medium":
       game.playerRadius = 12;
-      game.moveSpeed = 6.5;
+      game.moveSpeed = 13;
       game.obstacleArea = 7;
       game.obstacleStartCount = 16;
       break;
     case "large":
       game.playerRadius = 8;
-      game.moveSpeed = 6.5;
+      game.moveSpeed = 13;
       game.obstacleArea = 7;
       game.obstacleStartCount = 32;
       break;

@@ -1,0 +1,184 @@
+:root {
+  --dark: oklch(0.15 0 0);
+  --transDark: oklch(0.15 0 0 / 0.3);
+  --light: oklch(0.9 0 0);
+}
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+
+  font-family: "Orbitron";
+  font-weight: 900;
+  font-size: 20px;
+
+  border-radius: 4px;
+  corner-shape: squircle;
+}
+
+*::selection {
+  background: var(--dark);
+  color: var(--light);
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  position: fixed;
+}
+
+input,
+textarea,
+select {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--dark);
+  opacity: 1;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  background: var(--transDark);
+  border-radius: 4px;
+  corner-shape: squircle;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: var(--transDark);
+  border: none;
+  border-radius: 4px;
+  corner-shape: squircle;
+}
+
+body {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+
+  height: 100vh;
+
+  background-color: var(--dark);
+
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  background-color: var(--input);
+  color: var(--dark);
+
+  border: none;
+  outline: none;
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+#App {
+  height: 768px;
+  width: 1024px;
+  position: relative;
+}
+
+#Game {
+  position: absolute;
+  width: 1024px;
+  height: 768px;
+}
+
+#Menu {
+  position: absolute;
+
+  width: 1024px;
+  height: 768px;
+
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 56px);
+  grid-template-rows: repeat(auto-fill, 56px);
+  gap: 8px;
+
+  padding: 4px;
+
+  justify-content: center;
+  align-content: center;
+
+  backdrop-filter: blur(16px);
+  background-color: var(--transDark);
+}
+
+#Menu > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-break: strict;
+  padding: 8px;
+  opacity: 1;
+  color: var(--dark);
+}
+
+#Huge {
+  position: absolute;
+  display: flex;
+  font-size: 256px;
+  color: var(--light);
+  width: 1024px;
+  height: 768px;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  opacity: 0.9;
+  transition: none;
+  padding: 8px;
+
+  text-shadow:
+    0 0 8px color-mix(in srgb, var(--input) 60%, transparent),
+    0 0 16px color-mix(in srgb, var(--input) 50%, transparent),
+    0 0 32px color-mix(in srgb, var(--input) 40%, transparent);
+}
+
+#Huge.fading-out {
+  transition: opacity 1000ms ease-in;
+}
+
+#Stats {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 1024px;
+  background: transparent;
+  color: var(--light);
+  pointer-events: none;
+}

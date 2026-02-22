@@ -391,6 +391,20 @@ const renderObstaclePreviewScene = (
 
   // main preview obstacle
 
+  ctx.fillStyle = color.obstacleColorBrilliant(-1);
+  ctx.strokeStyle = color.obstacleColorBrilliant(-1);
+
+  // ghost preview poly
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(previewPoly[0][0], previewPoly[0][1]);
+  for (let k = 1; k < previewPoly.length; k++)
+    ctx.lineTo(previewPoly[k][0], previewPoly[k][1]);
+  ctx.closePath();
+  ctx.fill("nonzero");
+  ctx.restore();
+
   if (!renderSettings.glowEnabled || game.previewObstacle.index === -1)
     ctx.fillStyle = color.obstacleColorBrilliant(game.previewObstacle.index);
   else ctx.fillStyle = color.backgroundBrilliant;
@@ -410,19 +424,6 @@ const renderObstaclePreviewScene = (
 
   // blockers
   drawObstacleBlockers(game, ctx, color);
-
-  // ghost preview poly
-  if (renderSettings.glowEnabled && game.previewObstacle.index !== -1)
-    ctx.fillStyle = color.obstacleColorBrilliant(-1);
-  ctx.save();
-  ctx.globalAlpha = 0.5;
-  ctx.beginPath();
-  ctx.moveTo(previewPoly[0][0], previewPoly[0][1]);
-  for (let k = 1; k < previewPoly.length; k++)
-    ctx.lineTo(previewPoly[k][0], previewPoly[k][1]);
-  ctx.closePath();
-  ctx.fill("nonzero");
-  ctx.restore();
 
   // spawns + center objective + freeze-frame shots
   drawPreviewSpawnsAndObjective(game, ctx, color, renderSettings);
