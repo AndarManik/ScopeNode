@@ -1,4 +1,4 @@
-const V = "9";
+const V = "10";
 export const addUserSettings = (app) => {
   const version = localStorage.getItem("version");
   if (version != V) {
@@ -17,7 +17,7 @@ export const addUserSettings = (app) => {
   rawSettings.game = {
     playerRadius: defaultGet("game.playerRadius", 12),
     moveSpeed: defaultGet("game.moveSpeed", 6.5),
-    obstacleArea: defaultGet("game.obstacleArea", 7),
+    obstacleArea: defaultGet("game.obstacleArea", 13),
     obstacleStartCount: defaultGet("game.obstacleStartCount", 16),
   };
 

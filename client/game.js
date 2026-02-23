@@ -232,8 +232,6 @@ export const newGame = (app, options, team1, team2) => {
 
     app.socket.json({ command: "client ready" });
   } else {
-    game.choosingObstacle = true;
-
     game.handleMessage = () => {};
     game.updatePlayers = () => {};
   }

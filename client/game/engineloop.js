@@ -42,12 +42,10 @@ export const startEngine = (game, app, team1, team2) => {
   const getDesiredIntervalMs = (cap = renderSettings.fpsCap) =>
     cap == null || cap < 0 ? 0 : 1000 / cap;
 
+  const canRaf = typeof requestAnimationFrame === "function";
   const scheduleNext = () => {
     const interval = getDesiredIntervalMs();
-    let preferRAF = isFocused;
-    preferRAF &&= renderSettings.vSync;
-    preferRAF &&= typeof requestAnimationFrame === "function";
-    if (preferRAF) rafId = requestAnimationFrame(tick);
+    if (renderSettings.vSync && canRaf) rafId = requestAnimationFrame(tick);
     else timeoutId = setTimeout(tick, interval > 0 ? interval : 0);
   };
 
