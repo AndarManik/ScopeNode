@@ -36,8 +36,8 @@ export const newColor = (app) => {
     color.team1Point = `oklch(0.35 0.025 ${hue - 45})`;
     color.team2Point = `oklch(0.35 0.025 ${hue + 45})`;
 
-    color.intersectPoint1 = `oklch(0.55 0.045 ${hue + 60})`;
-    color.intersectPoint2 = `oklch(0.55 0.045 ${hue - 60})`;
+    color.intersectPoint1 = `oklch(0.15 0.015 ${hue})`;
+    color.intersectPoint2 = `oklch(0.15 0.015 ${hue})`;
 
     color.team1Disk = `oklch(0.75 0.125 ${hue - 72})`;
     color.team2Disk = `oklch(0.75 0.125 ${hue + 72})`;

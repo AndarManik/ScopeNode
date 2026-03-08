@@ -223,6 +223,26 @@ const translateNormalIntoPoly = (
   }
 };
 
+function makeSpiralShifts(count, maxRadius = 1) {
+  if (count <= 0) return [];
+  if (count === 1) return [[0, 0]];
+
+  const shifts = [[0, 0]];
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~2.39996
+
+  for (let i = 1; i < count; i++) {
+    const t = i / (count - 1); // 0..1
+    const r = maxRadius * t; // spreads points more evenly by area
+    const a = i * goldenAngle;
+    shifts.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+
+  return shifts;
+}
+
+export const shifts = makeSpiralShifts(20);
+console.log(shifts);
+
 export function allKillTargets(game, position, enemies) {
   const killTargets = [];
   if (!position || position.length === 0 || !enemies || enemies.length === 0)
@@ -234,30 +254,50 @@ export function allKillTargets(game, position, enemies) {
   const r = r_ + game.playerRadius;
   const r2 = r * r;
 
-  for (const enemy of enemies) {
-    const closestBody = closestPointToBodyUnion(...position, enemy[1]);
-    if (!closestBody.point) continue;
+  const size = game.mapHeight / 2;
 
-    const closestVision = closestPointToClosedPolygon(
-      ...closestBody.point,
-      enemy[0],
-    );
+  for (const [xShift, yShift] of shifts) {
+    const x = position[0] + size * xShift;
+    const y = position[1] + size * yShift;
 
-    if (closestVision.dist2 < r2) continue;
+    let sampleIsUnseen = true;
+    const potentialKillTargets = [];
 
-    const killTarget = translateNormalIntoPoly(
-      closestBody.point,
-      closestBody.line, // must be provided by closestPointToBodyUnion
-      r_,
-      closestBody.poly,
-    );
+    for (const enemy of enemies) {
+      const outsideOfSeen = closestPointToPolygon(x, y, enemy[0]).dist2;
+      if (!outsideOfSeen) {
+        sampleIsUnseen = false;
+        break;
+      }
 
-    killTargets.push(killTarget);
+      const closestBody = closestPointToPolygonUnion(x, y, enemy[1]);
+      if (!closestBody.point) continue;
+
+      const closestVision = closestPointToPolygon(
+        ...closestBody.point,
+        enemy[0],
+      );
+      if (closestVision.dist2 < r2) continue;
+
+      const killTarget = translateNormalIntoPoly(
+        closestBody.point,
+        closestBody.line, // must be provided by closestPointToPolygonUnion
+        r_,
+        closestBody.poly,
+      );
+
+      if (killTarget[0] < 0 || killTarget[1] < 0) continue;
+      if (killTarget[0] > game.mapWidth || killTarget[1] > game.mapHeight)
+        continue;
+
+      potentialKillTargets.push(killTarget);
+    }
+
+    if (sampleIsUnseen) killTargets.push(...potentialKillTargets);
   }
 
   return killTargets;
 }
-
 const translateTowards = (from, to, distance) => {
   const dx = to[0] - from[0];
   const dy = to[1] - from[1];
@@ -284,9 +324,9 @@ export function allDieTargets(game, position, enemies) {
     return dieTargets;
 
   for (const enemy of enemies) {
-    const closestBody = closestPointToBodyUnion(...position, enemy[1]).point;
+    const closestBody = closestPointToPolygonUnion(...position, enemy[1]).point;
 
-    const closestVision = closestPointToClosedPolygon(...closestBody, enemy[0]);
+    const closestVision = closestPointToPolygon(...closestBody, enemy[0]);
 
     const a = closestVision.line[0];
     const b = closestVision.line[1];
@@ -300,18 +340,20 @@ export function allDieTargets(game, position, enemies) {
     const db2 = dbx * dbx + dby * dby;
 
     const pointOfInterest = da2 <= db2 ? a : b;
-    const r = game.playerRadius;
+    const r = game.playerRadius * 0.707;
 
-    const risk = 0.5;
+    const rawRisk = 1 - Math.sqrt(closestVision.dist2) / game.playerRadius;
+    const risk = Math.max(0, Math.min(1, rawRisk));
     const arisk = 1 - risk;
     // 0 to 1
 
-    const fleeX = risk * ex + arisk * pointOfInterest[0];
-    const fleeY = risk * ey + arisk * pointOfInterest[1];
+    const riskFlee = translateAway(position, closestVision.point, r);
+    const ariskflee = translateTowards(position, pointOfInterest, r);
 
-    const dieTarget = translateAway(position, [fleeX, fleeY], r);
+    const fleeX = risk * riskFlee[0] + arisk * ariskflee[0];
+    const fleeY = risk * riskFlee[1] + arisk * ariskflee[1];
 
-    dieTargets.push(dieTarget);
+    dieTargets.push([fleeX, fleeY]);
   }
 
   return dieTargets;
@@ -322,45 +364,41 @@ export function registerTarget(shooter, enemies, radius) {
   let bodyPoint = null;
   let bestEnemy = null;
   for (const enemy of enemies) {
-    const { point, dist2 } = closestPointToBodyUnion(...shooter[2], enemy[1]);
+    const { point, dist2 } = closestPointToPolygonUnion(
+      ...shooter[2],
+      enemy[1],
+    );
     if (dist2 < bodyDist) {
       bestEnemy = enemy;
       bodyDist = dist2;
       bodyPoint = point;
     }
   }
-  if (!bestEnemy) return [null, false];
+  if (!bestEnemy) return null;
 
-  const { point: subTarget, dist2: enemyBodyDist } = closestPointToBodyUnion(
+  const { point: subTarget, dist2: enemyBodyDist } = closestPointToPolygonUnion(
     ...bestEnemy[2],
     shooter[1],
   );
 
-  const target = closestPointToClosedPolygon(
+  const target = closestPointToPolygon(
     ...(subTarget || bestEnemy[2]),
     shooter[0],
   ).point;
 
-  const pointDist = closestPointToClosedPolygon(
-    ...bodyPoint,
-    bestEnemy[0],
-  ).dist2;
-
-  const shooterAdvantage = Math.sqrt(pointDist) > radius;
-
   const targetClose = Math.sqrt(enemyBodyDist) < radius * 8;
 
-  return [targetClose ? target : null, shooterAdvantage];
+  return targetClose ? target : null;
 }
 
-function closestPointToBodyUnion(px, py, bodyPolys) {
+function closestPointToPolygonUnion(px, py, bodyPolys) {
   let bestPoly = null;
   let bestLine = null;
   let bestPoint = null;
   let bestD2 = Infinity;
   for (let i = 0; i < bodyPolys.length; i++) {
     const poly = bodyPolys[i];
-    const { line, point, dist2 } = closestPointToClosedPolygon(px, py, poly);
+    const { line, point, dist2 } = closestPointToPolygon(px, py, poly);
     if (dist2 < bestD2) {
       bestD2 = dist2;
       bestPoint = point;
@@ -373,7 +411,7 @@ function closestPointToBodyUnion(px, py, bodyPolys) {
   return { poly: bestPoly, line: bestLine, point: bestPoint, dist2: bestD2 };
 }
 
-function closestPointToClosedPolygon(px, py, poly) {
+function closestPointToPolygon(px, py, poly) {
   let bestX = 0;
   let bestY = 0;
   let bestD2 = Infinity;

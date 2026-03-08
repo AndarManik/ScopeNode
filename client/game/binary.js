@@ -4,9 +4,13 @@ export const packState = (uuidToInt, uuid, state) => {
     throw new Error("intid not integer in [0, 255]");
 
   const [startTick, endTick] = state.tick;
-  const time = Number(state.time ?? 0); // NEW
+  const time = Number(state.time ?? 0);
   const [x, y] = state.position;
   const vector = state.vector || [];
+  const moveSpeed = Number(state.moveSpeed ?? 0);
+
+  if (!Number.isFinite(moveSpeed))
+    throw new Error("moveSpeed must be a finite number");
 
   // ticks are int32 now
   if (!Number.isInteger(startTick) || !Number.isInteger(endTick))
@@ -17,7 +21,6 @@ export const packState = (uuidToInt, uuid, state) => {
   if (endTick < -2147483648 || endTick > 2147483647)
     throw new Error("endTick out of int32 range");
 
-  // NEW: time validation (float)
   if (!Number.isFinite(time)) throw new Error("time must be a finite number");
 
   const vectorLength = vector.length;
@@ -91,8 +94,8 @@ export const packState = (uuidToInt, uuid, state) => {
   // per-vector entry: uuidInt (uint8) + tick (int32)
   const entrySize = 1 + 4;
 
-  // intid + startTick(i32) + endTick(i32) + time(f32) + x(f32) + y(f32) + vectorLength(u8)
-  const headerSize = 1 + 4 + 4 + 4 + 4 + 4 + 1; // NEW: +4 for time
+  // intid + startTick(i32) + endTick(i32) + time(f32) + moveSpeed(f32) + x(f32) + y(f32) + vectorLength(u8)
+  const headerSize = 1 + 4 + 4 + 4 + 4 + 4 + 4 + 1;
 
   // light encoding size:
   // lightOuterCount (u32) +
@@ -110,7 +113,7 @@ export const packState = (uuidToInt, uuid, state) => {
   const pathSize = 4 + pathPointCount * 8;
 
   const buffer = new ArrayBuffer(
-    headerSize + lightSize + pathSize + vectorLength * entrySize
+    headerSize + lightSize + pathSize + vectorLength * entrySize,
   );
   const view = new DataView(buffer);
 
@@ -127,6 +130,10 @@ export const packState = (uuidToInt, uuid, state) => {
 
   // NEW: time (float32)
   view.setFloat32(offset, time, true);
+  offset += 4;
+
+  // NEW: moveSpeed (float32)
+  view.setFloat32(offset, moveSpeed, true);
   offset += 4;
 
   // position (float32)
@@ -219,6 +226,10 @@ export const unpackState = (intToUUID, buffer) => {
   const time = view.getFloat32(offset, true);
   offset += 4;
 
+  // NEW: moveSpeed (float32)
+  const moveSpeed = view.getFloat32(offset, true);
+  offset += 4;
+
   // position (float32)
   const x = view.getFloat32(offset, true);
   offset += 4;
@@ -293,6 +304,7 @@ export const unpackState = (intToUUID, buffer) => {
     state: {
       tick: [startTick, endTick],
       time,
+      moveSpeed,
       position: [x, y],
       vector,
       light,

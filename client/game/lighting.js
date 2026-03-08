@@ -1,4 +1,4 @@
-import { LightGraph } from "./lightVisibilityGraph.js";
+import { VisibilityGraph } from "./visibilitygraph.js";
 import "./martinez.min.js";
 import { removeHoles, toMulti } from "./martinezutil.js";
 
@@ -13,6 +13,6 @@ export const pushManyLightingObstacles = (game, obstacles) => {
     else game.lightTotal = martinez.union(game.lightTotal, newLightGroup);
     game.lightTotal = removeHoles(game.lightTotal);
   });
-  game.lightGraph = new LightGraph(game);
+  game.lightGraph = new VisibilityGraph(game);
   game.lightTotal.forEach(([poly]) => game.lightGraph.pushPolygon(poly));
 };

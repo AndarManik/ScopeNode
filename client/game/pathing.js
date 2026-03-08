@@ -1,5 +1,5 @@
 import { pointInClosedPolygonInclusive } from "./hitreg.js";
-import { LightGraph } from "./lightVisibilityGraph.js";
+import { VisibilityGraph } from "./visibilitygraph.js";
 import { removeHoles, toMulti } from "./martinezutil.js";
 import { kickout, newKickoutParams } from "./pathkickout.js";
 
@@ -14,7 +14,7 @@ export const pushManyPathingObstacle = (game, obstacles) => {
     else game.pathTotal = martinez.union(game.pathTotal, newPathGroup);
     game.pathTotal = removeHoles(game.pathTotal);
   });
-  game.pathGraph = new LightGraph(game);
+  game.pathGraph = new VisibilityGraph(game);
   game.pathTotal.forEach(([poly]) => game.pathGraph.pushPolygon(poly));
 
   const lazyAPSP = makeLazyAPSP(game.pathGraph);
@@ -741,3 +741,9 @@ class MinHeap {
     return top;
   }
 }
+
+const expansionPather = (game) => {
+  const { vertices, edges } = game.pathGraph.edges;
+  const polygons = game.pathTotal.map(([poly]) => poly);
+
+};

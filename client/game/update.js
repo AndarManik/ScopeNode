@@ -28,220 +28,144 @@ export const update = (game, app, delta, team1) => {
   if (game.buildingObstalces) return;
   if (game.choosingObstacle) return newObstaclePreview(game, app.socket);
 
-  if (game.isMultiPlayer) multiPlayerUpdate(game, app, delta, team1);
-  else singlePlayerUpdate(game, delta, team1);
-};
-
-const singlePlayerUpdate = (game, delta, team1) => {
   if (!game.pathGraph) return;
+
   updatePlayerPosition(game, team1, delta);
-  updateBotPositions(game, team1, delta);
+
+  game.team1Target = [...game.team1Lights.values()];
+  game.team2Target = [...game.team2Lights.values()];
+
+  if (game.isMultiPlayer) updateGlobalPositions(game, team1, app, delta);
+  else updateBotPositions(game, team1, delta);
 
   game.team1Lights = new Map();
   game.team2Lights = new Map();
   if (!game.lightGraph) return;
 
-  updatePlayerLight(game, team1);
-  updateBotLights(game, team1);
+  updateLights(game, team1);
+  updateTargets(game, delta);
+  updateAdvantage(game);
 
-  updatePlayerAim(game, delta);
+  if (game.isMultiPlayer) updateShots(game, delta);
+  else updateSinglePlayerShots(game, team1, delta);
+};
 
-  updateSinglePlayerShots(game, team1, delta);
+const updatePlayerPosition = (game, team1, delta) => {
+  if (!game.player.isAlive) return;
+  const player = game.player;
+  const shiftSlow = game.keyboard.shift ? 2 / 3 : 1;
+  const ctrlSlow = game.keyboard.ctrl ? 1 / 2 : 1;
+  player.moveSpeed = shiftSlow * ctrlSlow * game.moveSpeed;
+  const step = player.moveSpeed * game.playerRadius * delta;
+  const target = getPlayerPathTarget(game);
+  player.path = planPath(game, player.position, target).path;
+  if (!game.preRound) moveAlongPath(player.position, player.path, step);
 
-  let team1Distance = game.isTeam1 ? game.distanceToObj : Infinity;
-  let team2Distance = !game.isTeam1 ? game.distanceToObj : Infinity;
+  const objective = objectiveLocation(game, team1, player);
+  player.distanceToObj = planPath(game, player.position, objective).distance;
+};
 
-  for (const bot of game.bots) {
-    if (team1.has(bot.uuid) && bot.distanceToObj < team1Distance)
-      team1Distance = bot.distanceToObj;
-    if (!team1.has(bot.uuid) && bot.distanceToObj < team2Distance)
-      team2Distance = bot.distanceToObj;
+const updateGlobalPositions = (game, team1, app, delta) => {
+  let interps = 0;
+  const { playerRadius } = game;
+  for (const state of game.players) {
+    if (state.type !== "online") continue;
+    // vServer sets seen to 0 when state is new
+    state.seen++;
+    if (state.seen > 1 && !game.preRound) {
+      const step = state.moveSpeed * playerRadius * delta;
+      moveAlongPath(state.position, state.path, step);
+      interps++;
+    }
+
+    const objective = objectiveLocation(game, team1, state);
+    state.distanceToObj = planPath(game, state.position, objective).distance;
   }
 
-  for (const bot of game.bots) {
-    if (team1.has(bot.uuid)) bot.advantage = team2Distance > bot.distanceToObj;
-    else bot.advantage = team1Distance > bot.distanceToObj;
-  }
-
-  game.advantage = game.isTeam1
-    ? team2Distance > game.distanceToObj
-    : team1Distance > game.distanceToObj;
+  app.stats.log.set("intrps", interps);
 };
 
 const updateBotPositions = (game, team1, delta) => {
-  game.team1Target = [...game.team1Lights.values()];
-  game.team2Target = [...game.team2Lights.values()];
-
   game.team1Distance = makeSafeGraphQueryFromPolys(game, game.team1Target);
   game.team2Distance = makeSafeGraphQueryFromPolys(game, game.team2Target);
 
   game.team1Used = [];
   game.team2Used = [];
-  for (const bot of game.bots) {
-    bot.path = null;
-  }
+  for (const bot of game.players) if (bot.type === "bot") bot.path = null;
 
-  for (const bot of game.bots) {
-    pathBotToTargets(game, team1, allKillTargets, bot);
+  for (const bot of game.players) {
+    if (bot.type !== "bot") continue;
     pathBotToTargets(
       game,
       team1,
       () => [objectiveLocation(game, team1, bot)],
       bot,
     );
+    pathBotToTargets(game, team1, allKillTargets, bot);
+
     pathBotToTargets(game, team1, allDieTargets, bot);
   }
 
-  for (const bot of game.bots) if (!bot.path) bot.path = [];
+  for (const bot of game.players)
+    if (bot.type === "bot" && !bot.path) bot.path = [];
 
   moveBotsAlongPaths(game, team1, delta);
-
-  updateBotAimTargets(game, team1, delta);
 };
 
-function objectiveLocation(game, team1, bot) {
-  const playerRadius = game.playerRadius;
+const updateLights = (game, team1) => {
+  for (const player of game.players) {
+    if (!player.isAlive) continue;
 
-  const [cx, cy] = team1.has(bot.uuid)
-    ? game.team1Objective
-    : game.team2Objective;
-
-  const maxObjectiveRadius = Math.hypot(game.mapWidth, game.mapHeight);
-
-  const startTime = game.isMultiPlayer
-    ? game.virtualServer.startTime
-    : game.startTime;
-  const time = (performance.now() - startTime) / 1000;
-  const timeAlpha = Math.min(1, Math.max(0, (time - 30) / 30) ** 3);
-  const timeBeta = 1 - timeAlpha;
-  const rawObjectiveRadius =
-    timeBeta * playerRadius + timeAlpha * maxObjectiveRadius;
-  const objectiveRadius = Math.min(
-    rawObjectiveRadius,
-    maxObjectiveRadius + playerRadius,
-  );
-
-  const offset = objectiveRadius + 0.9 * playerRadius;
-
-  const dx = bot.position[0] - cx;
-  const dy = bot.position[1] - cy;
-  const len = Math.hypot(dx, dy) || 1;
-  const desired = [cx + (dx / len) * offset, cy + (dy / len) * offset];
-  return desired;
-}
-
-function pathBotToTargets(game, team1, targetFunc, bot) {
-  if (bot.path) return;
-
-  const STEP = game.playerRadius * 4;
-  const STEP2 = STEP * STEP;
-
-  const isTeam1 = team1.has(bot.uuid);
-
-  const enemyExposure = isTeam1 ? game.team2Target : game.team1Target;
-  const teamUsed = isTeam1 ? game.team1Used : game.team2Used;
-  const targets = targetFunc(game, bot.position, enemyExposure).filter(
-    ([targetX, targetY]) => {
-      for (const [usedX, usedY] of teamUsed) {
-        const dx = targetX - usedX;
-        const dy = targetY - usedY;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < STEP2) return false;
-      }
-      return true;
-    },
-  );
-
-  const avoid = isTeam1 ? game.team2Distance : game.team1Distance;
-  let bestDistance = Infinity;
-  let bestTarget = null;
-  let bestPath = null;
-  for (const target of targets) {
-    const { path, distance } = planPathSafe(game, bot.position, target, avoid);
-    if (distance >= bestDistance) continue;
-    bestDistance = distance;
-    bestTarget = target;
-    bestPath = path;
+    player.light =
+      player.type !== "online" || player.seen > 1
+        ? game.lightGraph.shineAt(player.position)
+        : player.light;
+    player.light[2] = player.position;
+    const teamLight = player.team1 ? game.team1Lights : game.team2Lights;
+    teamLight.set(player.uuid, player.light);
   }
+};
 
-  if (!bestPath) return;
-
-  bot.path = bestPath;
-  teamUsed.push(bestTarget);
-}
-
-function moveBotsAlongPaths(game, team1, delta) {
-  for (const bot of game.bots) {
-    moveAlongPath(
-      bot.position,
-      bot.path,
-      game.moveSpeed * game.playerRadius * delta,
-    );
-    bot.position = kickout(bot.position, game.kickoutParams);
-
-    bot.position[0] = Math.max(
-      game.playerRadius,
-      Math.min(game.mapWidth - game.playerRadius, bot.position[0]),
-    );
-    bot.position[1] = Math.max(
-      game.playerRadius,
-      Math.min(game.mapHeight - game.playerRadius, bot.position[1]),
-    );
-
-    const objective = objectiveLocation(game, team1, bot);
-    bot.distanceToObj = planPath(game, bot.position, objective).distance;
+function updateTargets(game, delta) {
+  for (const player of game.players) {
+    if (!player.isAlive) continue;
+    const enemies = player.team1 ? game.team2Target : game.team1Target;
+    const rawTarget = registerTarget(player.light, enemies, game.playerRadius);
+    const fallback = rawTarget || player.path[1] || player.position;
+    player.target = smoothTargetPos(player, player.position, fallback, delta);
   }
 }
 
-function updateBotAimTargets(game, team1, delta) {
-  const { team1Target, team2Target } = game;
-  for (const bot of game.bots) {
-    const isTeam1 = team1.has(bot.uuid);
-    const shooter = isTeam1
-      ? game.team1Lights.get(bot.uuid)
-      : game.team2Lights.get(bot.uuid);
-    const enemies = isTeam1 ? team2Target : team1Target;
-
-    const rawTarget = registerTarget(shooter, enemies, game.playerRadius);
-    const [desiredPos, hasAdvantage] = rawTarget || [false, false];
-    const fallback = desiredPos || bot.path[1] || bot.position;
-    const target = smoothTargetPos(bot, bot.position, fallback, delta);
-    bot.target = [target, hasAdvantage];
+const updateAdvantage = (game) => {
+  let team1Distance = Infinity;
+  let team2Distance = Infinity;
+  for (const { team1, team2, distanceToObj, isAlive } of game.players) {
+    if (!isAlive) continue;
+    if (team1 && distanceToObj < team1Distance) team1Distance = distanceToObj;
+    if (team2 && distanceToObj < team2Distance) team2Distance = distanceToObj;
   }
-}
-
-const updateBotLights = (game, team1) => {
-  for (const bot of game.bots) {
-    const light = game.lightGraph.shineAt(bot.position);
-    light.push(bot.position);
-    bot.light = light;
-    if (team1.has(bot.uuid)) game.team1Lights.set(bot.uuid, light);
-    else game.team2Lights.set(bot.uuid, light);
+  for (const player of game.players) {
+    const opposingDistance = player.team1 ? team2Distance : team1Distance;
+    player.advantage = player.distanceToObj < opposingDistance;
   }
 };
 
 const updateSinglePlayerShots = (game, team1, delta) => {
   if (game.noBots) return;
-  const player = {
-    uuid: "player",
-    position: game.playerPosition,
-    light: game.playerLight,
-  };
-
   const team1States = [];
   const team2States = [];
 
-  if (!game.playerIsDead) team1States.push(player);
-  for (const bot of game.bots)
-    (team1.has(bot.uuid) ? team1States : team2States).push(bot);
+  for (const player of game.players) {
+    if (!player.isAlive) continue;
+    (player.team1 ? team1States : team2States).push(player);
+  }
 
   const time = (performance.now() - game.startTime) / 1000;
 
   const shots = registerTeamHits(game, team1States, team2States, time);
   shots.forEach((shot) => {
     game.shots.add(shot);
-    if (shot.killed === "player") game.playerIsDead = true;
-    else game.bots = game.bots.filter(({ uuid }) => uuid !== shot.killed);
+    game.playersMap.get(shot.killed).isAlive = false;
   });
 
   const gameOver = !team1States.length || !team2States.length;
@@ -283,63 +207,125 @@ const updateSinglePlayerShots = (game, team1, delta) => {
   }
 };
 
-const multiPlayerUpdate = (game, app, delta, team1) => {
-  game.path = [];
-  updatePlayerPosition(game, team1, delta);
-  updateGlobalPositions(game, team1, app, delta);
-  updateShots(game, delta);
-
-  game.team1Lights = new Map();
-  game.team2Lights = new Map();
-  if (!game.lightGraph) return;
-
-  updatePlayerLight(game, team1);
-  updateGlobalLights(game, team1);
-
-  updatePlayerAim(game, delta);
-  updateGlobalAim(game, team1, delta);
-
-  let team1Distance = game.isTeam1 ? game.distanceToObj : Infinity;
-  let team2Distance = !game.isTeam1 ? game.distanceToObj : Infinity;
-
-  for (const [uuid, state] of game.virtualServer.globalStates) {
-    if (team1.has(uuid) && state.distanceToObj < team1Distance)
-      team1Distance = state.distanceToObj;
-    if (!team1.has(uuid) && state.distanceToObj < team2Distance)
-      team2Distance = state.distanceToObj;
-  }
-
-  for (const [uuid, state] of game.virtualServer.globalStates) {
-    if (team1.has(uuid)) state.advantage = team2Distance > state.distanceToObj;
-    else state.advantage = team1Distance > state.distanceToObj;
-  }
-
-  game.advantage = game.isTeam1
-    ? team2Distance > game.distanceToObj
-    : team1Distance > game.distanceToObj;
+const updateShots = (game, delta) => {
+  game.shots.forEach((shot) => {
+    if (shot.finished) return;
+    if (shot.anim == null) shot.anim = 0;
+    else shot.anim += delta;
+  });
 };
 
-const updatePlayerPosition = (game, team1, delta) => {
-  if (game.playerIsDead) return;
-  const shiftSlow = game.keyboard.shift ? 2 / 3 : 1;
-  const ctrlSlow = game.keyboard.ctrl ? 1 / 2 : 1;
-  const moveSpeed = shiftSlow * ctrlSlow * game.moveSpeed;
-  const step = moveSpeed * game.playerRadius * delta;
-  const target = getPlayerPathTarget(game);
-  game.path = planPath(game, game.playerPosition, target).path;
-  if (!game.preRound) moveAlongPath(game.playerPosition, game.path, step);
+function objectiveLocation(game, team1, bot) {
+  const playerRadius = game.playerRadius;
 
-  // CALM: we should just have a player object on the game instead of having it's field be spread out onto the game.
-  const player = {
-    uuid: game.userId,
-    position: game.playerPosition,
-  };
-  const objective = objectiveLocation(game, team1, player);
-  game.distanceToObj = planPath(game, game.playerPosition, objective).distance;
-};
+  const [cx, cy] = team1.has(bot.uuid)
+    ? game.team1Objective
+    : game.team2Objective;
+
+  const maxObjectiveRadius = Math.hypot(game.mapWidth, game.mapHeight);
+
+  const time = (performance.now() - game.startTime) / 1000;
+  const timeAlpha = Math.min(1, Math.max(0, (time - 30) / 30) ** 3);
+  const timeBeta = 1 - timeAlpha;
+  const rawObjectiveRadius =
+    timeBeta * playerRadius + timeAlpha * maxObjectiveRadius;
+  const objectiveRadius = Math.min(
+    rawObjectiveRadius,
+    maxObjectiveRadius + playerRadius,
+  );
+
+  const offset = objectiveRadius + 0.9 * playerRadius;
+
+  const dx = bot.position[0] - cx;
+  const dy = bot.position[1] - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  const desired = [cx + (dx / len) * offset, cy + (dy / len) * offset];
+  return desired;
+}
+
+function pathBotToTargets(game, team1, targetFunc, bot) {
+  if (bot.path) return;
+
+  const STEP = game.playerRadius * 4;
+  const STEP2 = STEP * STEP;
+  const TOP_N = 5;
+
+  const isTeam1 = team1.has(bot.uuid);
+
+  const enemyExposure = isTeam1 ? game.team2Target : game.team1Target;
+  const teamUsed = isTeam1 ? game.team1Used : game.team2Used;
+  const avoid = isTeam1 ? game.team2Distance : game.team1Distance;
+
+  const targets = targetFunc(game, bot.position, enemyExposure).filter(
+    ([targetX, targetY]) => {
+      for (const [usedX, usedY] of teamUsed) {
+        const dx = targetX - usedX;
+        const dy = targetY - usedY;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < STEP2) return false;
+      }
+      return true;
+    },
+  );
+
+  if (!targets.length) return;
+
+  const unsafeRanked = [];
+  for (const target of targets) {
+    const { distance } = planPath(game, bot.position, target);
+    if (!Number.isFinite(distance)) continue;
+    unsafeRanked.push({ target, distance });
+  }
+
+  if (!unsafeRanked.length) return;
+
+  unsafeRanked.sort((a, b) => a.distance - b.distance);
+  const shortlist = unsafeRanked.slice(0, TOP_N);
+
+  let bestDistance = Infinity;
+  let bestTarget = null;
+  let bestPath = null;
+
+  for (const { target } of shortlist) {
+    const { path, distance } = planPathSafe(game, bot.position, target, avoid);
+    if (distance >= bestDistance) continue;
+    bestDistance = distance;
+    bestTarget = target;
+    bestPath = path;
+  }
+
+  if (!bestPath) return;
+
+  bot.path = bestPath;
+  teamUsed.push(bestTarget);
+}
+
+function moveBotsAlongPaths(game, team1, delta) {
+  for (const bot of game.players) {
+    if (bot.type !== "bot") continue;
+    moveAlongPath(
+      bot.position,
+      bot.path,
+      game.moveSpeed * game.playerRadius * delta,
+    );
+    bot.position = kickout(bot.position, game.kickoutParams);
+
+    bot.position[0] = Math.max(
+      game.playerRadius,
+      Math.min(game.mapWidth - game.playerRadius, bot.position[0]),
+    );
+    bot.position[1] = Math.max(
+      game.playerRadius,
+      Math.min(game.mapHeight - game.playerRadius, bot.position[1]),
+    );
+
+    const objective = objectiveLocation(game, team1, bot);
+    bot.distanceToObj = planPath(game, bot.position, objective).distance;
+  }
+}
 
 const getPlayerPathTarget = (game) => {
-  if (game.keyboard.space) return game.playerPosition;
+  if (game.keyboard.space) return game.player.position;
   if (game.inputPreference === "mouse") return getMouseTarget(game);
   else return getWASDTarget(game);
 };
@@ -348,19 +334,19 @@ const getMouseTarget = (game) => {
   const [mx, my] = game.mouse;
   if (!game.mouse.isClicking) return game.mouse;
 
-  const [px, py] = game.playerPosition;
+  const [px, py] = game.player.position;
 
   const dx = mx - px;
   const dy = my - py;
   const d = Math.hypot(dx, dy);
   if (d === 0) return [px, py];
-  const dist = Math.min(game.playerRadius / 2, d);
+  const dist = Math.min(game.playerRadius * 0.7071, d);
   return [px + (dx / d) * dist, py + (dy / d) * dist];
 };
 
 const getWASDTarget = (game) => {
   const { w, a, s, d } = game.keyboard;
-  const [px, py] = game.playerPosition;
+  const [px, py] = game.player.position;
   const { playerRadius } = game;
 
   let x = (d - a) * (game.xSwap ? -1 : 1);
@@ -370,75 +356,7 @@ const getWASDTarget = (game) => {
   const len = Math.hypot(x, y);
   x /= len;
   y /= len;
-  return [px + (x * playerRadius) / 2, py + (y * playerRadius) / 2];
-};
-
-const updateGlobalPositions = (game, team1, app, delta) => {
-  let interps = 0;
-  const { moveSpeed, playerRadius } = game;
-  for (const [uuid, state] of game.virtualServer.globalStates) {
-    // vServer sets seen to 0 when state is new
-    state.seen++;
-    if (state.seen <= 2) {
-      const step = moveSpeed * playerRadius * delta;
-      moveAlongPath(state.position, state.path, step);
-    }
-
-    const objective = objectiveLocation(game, team1, { uuid, ...state });
-    state.distanceToObj = planPath(game, state.position, objective).distance;
-    interps++;
-  }
-
-  app.stats.log.set("intrps", interps);
-};
-
-const updatePlayerLight = (game, team1) => {
-  if (game.playerIsDead) return;
-  game.playerLight = game.lightGraph.shineAt(game.playerPosition);
-  game.playerLight.push(game.playerPosition);
-  const teamLight = game.isTeam1 ? game.team1Lights : game.team2Lights;
-  teamLight.set(game.userId, game.playerLight);
-};
-
-const updateGlobalLights = (game, team1) => {
-  for (const [uuid, state] of game.virtualServer.globalStates) {
-    const light =
-      state.seen > 1 ? game.lightGraph.shineAt(state.position) : state.light;
-    light.push(state.position);
-    if (team1.has(uuid)) game.team1Lights.set(uuid, light);
-    else game.team2Lights.set(uuid, light);
-  }
-};
-
-const updatePlayerAim = (game, delta) => {
-  if (game.playerIsDead) return;
-  const { playerPosition } = game;
-  const team1Target = [...game.team1Lights.values()];
-  const team2Target = [...game.team2Lights.values()];
-  const teamLight = game.isTeam1 ? game.team1Lights : game.team2Lights;
-  const shooter = teamLight.get(game.userId);
-  const enemies = game.isTeam1 ? team2Target : team1Target;
-  const rawTarget = registerTarget(shooter, enemies, game.playerRadius);
-  const [desiredPos, hasAdvantage] = rawTarget || [false, false];
-  const fallback = desiredPos || game.path[1] || game.mouse;
-  const target = smoothTargetPos(game, playerPosition, fallback, delta);
-  game.playerTarget = [target, hasAdvantage];
-};
-
-const updateGlobalAim = (game, team1, delta) => {
-  const team1Target = [...game.team1Lights.values()];
-  const team2Target = [...game.team2Lights.values()];
-  for (const [uuid, state] of game.virtualServer.globalStates) {
-    const isTeam1 = team1.has(uuid);
-    const shooter = (isTeam1 ? game.team1Lights : game.team2Lights).get(uuid);
-    const enemies = isTeam1 ? team2Target : team1Target;
-
-    const rawTarget = registerTarget(shooter, enemies, game.playerRadius);
-    const [desiredPos, hasAdvantage] = rawTarget || [false, false];
-    const fallback = desiredPos || state.path[1] || state.position;
-    const target = smoothTargetPos(state, state.position, fallback, delta);
-    state.target = [target, hasAdvantage];
-  }
+  return [px + x * playerRadius * 0.7071, py + y * playerRadius * 0.7071];
 };
 
 function shortestAngleDelta(target, current) {
@@ -449,10 +367,10 @@ function shortestAngleDelta(target, current) {
 }
 
 export function smoothTargetPos(state, pos, desiredPos, delta) {
-  if (!desiredPos) return state._smoothedTargetAngle ?? 0;
+  if (!desiredPos) return state.smoothedTargetAngle ?? 0;
 
   if (desiredPos[0] === pos[0] && desiredPos[1] === pos[1])
-    return state._smoothedTargetAngle;
+    return state.smoothedTargetAngle;
 
   const desiredAngle = Math.atan2(
     desiredPos[1] - pos[1],
@@ -460,13 +378,13 @@ export function smoothTargetPos(state, pos, desiredPos, delta) {
   );
 
   // First frame: snap to target
-  if (state._smoothedTargetAngle == null) {
-    state._smoothedTargetAngle = desiredAngle;
-    state._smoothedTargetAngularVel = 0;
+  if (state.smoothedTargetAngle == null) {
+    state.smoothedTargetAngle = desiredAngle;
+    state.smoothedTargetAngularVel = 0;
     return desiredAngle;
   }
 
-  const prevAngle = state._smoothedTargetAngle;
+  const prevAngle = state.smoothedTargetAngle;
   const HALF_LIFE = 0.04;
   const lambda = Math.log(2) / HALF_LIFE;
 
@@ -480,16 +398,8 @@ export function smoothTargetPos(state, pos, desiredPos, delta) {
   while (wrapped > Math.PI) wrapped -= 2 * Math.PI;
   while (wrapped < -Math.PI) wrapped += 2 * Math.PI;
 
-  state._smoothedTargetAngle = wrapped;
-  state._smoothedTargetAngularVel = vel;
+  state.smoothedTargetAngle = wrapped;
+  state.smoothedTargetAngularVel = vel;
 
   return wrapped;
 }
-
-const updateShots = (game, delta) => {
-  game.virtualServer.shots.forEach((shot) => {
-    if (shot.finished) return;
-    if (shot.anim == null) shot.anim = 0;
-    else shot.anim += delta;
-  });
-};

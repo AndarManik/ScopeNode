@@ -13,10 +13,9 @@ import { startEngine } from "./game/engineloop.js";
 export const newGame = (app, options, team1, team2) => {
   if (app.game) app.game.isDead = true;
 
-  const game = {};
+  const game = { ...values, ...app.settings.game };
 
-  Object.assign(game, values);
-  parseGameOptions(app, game, options);
+  parseGameOptions(game, options);
   game.renderSettings = app.settings.render;
   game.color = app.color;
 
@@ -24,17 +23,19 @@ export const newGame = (app, options, team1, team2) => {
 
   game.userId = game.isMultiPlayer ? app.menu.userId : "player";
   game.isTeam1 = !game.isMultiPlayer || team1.has(game.userId);
-  game.isSpec = false;
-  if (!game.isTeam1 && !team2.has(game.userId)) game.isSpec = true;
+  game.isSpec = !game.isTeam1 && !team2.has(game.userId);
+
+  game.team1 = game.isMultiPlayer ? team1 : new Set(["player"]);
+  game.team2 = game.isMultiPlayer ? team2 : new Set(["o2"]);
+
+  team1 = game.team1;
+  team2 = game.team2;
+
+  game.all = [...game.team1, ...game.team2].sort();
+  game.allInv = Object.fromEntries(game.all.map((uuid, i) => [uuid, i]));
 
   game.spawn1 = [2 * game.playerRadius, game.mapHeight / 2];
   game.spawn2 = [game.mapWidth - 2 * game.playerRadius, game.mapHeight / 2];
-
-  if (!game.isMultiPlayer) {
-    team1 = new Set(["player"]);
-    team2 = new Set(["o1", "o2"]);
-    game.bots = [];
-  }
 
   game.previewAlpha = 0;
   game.previewAngle = 0;
@@ -43,35 +44,27 @@ export const newGame = (app, options, team1, team2) => {
   game.keyboard = newKeyBoard(game, app.menu);
 
   game.init = () => {
-    game.playerIsDead = false || game.isSpec;
-    game.playerPosition = game.isTeam1 ? [...game.spawn1] : [...game.spawn2];
-    game.path = [];
-    game.playerLight = [[], []];
+    game.players = game.all.map((uuid) => {
+      const player = newPlayer(game, uuid);
+      player.type = game.isMultiPlayer ? "online" : "bot";
+      if (uuid === game.userId) {
+        game.player = player;
+        player.type = "player";
+      }
+      return player;
+    });
+
+    game.playersMap = new Map(game.players.map((p) => [p.uuid, p]));
+
+    if (game.isSpec) game.player.isAlive = false;
     game.team1Lights = new Map();
     game.team2Lights = new Map();
 
-    if (game.isMultiPlayer) return;
-
-    //game.playerIsDead = true;
-    game.bots.length = 0;
-
-    for (const uuid of team1)
-      if (uuid !== "player")
-        game.bots.push({
-          uuid,
-          position: [...game.spawn1],
-        });
-
-    for (const uuid of team2)
-      game.bots.push({
-        uuid,
-        position: [...game.spawn2],
-      });
-
-    if (!game.bots.length) game.noBots = true;
-
     game.startTime = performance.now();
     game.shots = new Set();
+    game.shotsFinished = false;
+
+    if (game.isMultiPlayer) return;
 
     game.buildingObstacles = true;
     initializeObstacles(game, () => (game.buildingObstacles = false));
@@ -104,7 +97,7 @@ export const newGame = (app, options, team1, team2) => {
     game.startVirtualServer = () => {
       game.preRound = true;
       game.init();
-      game.virtualServer = newVirtualServer(game, app, team1, team2);
+      game.virtualServer = newVirtualServer(game, app);
       game.virtualServer.start();
       app.socket.json({ command: "virtual server started" });
     };
@@ -129,7 +122,7 @@ export const newGame = (app, options, team1, team2) => {
 
     game.handleEndRound = (winner, score) => {
       const showRoundResultText = () => {
-        for (const shot of game.virtualServer.shots) if (!shot.isHit) return;
+        for (const shot of game.shots) if (!shot.isHit) return;
         clearInterval(checker);
 
         const teamString = game.isTeam1 ? "team1" : "team2";
@@ -168,7 +161,6 @@ export const newGame = (app, options, team1, team2) => {
         setTimeout(
           () => {
             // Show the number
-            if (!game.choosingObstacle) return;
             hugeText.classList.remove("fading-out");
             hugeText.style.opacity = 0.9;
             hugeText.style.fontSize = "512px";
@@ -239,10 +231,7 @@ export const newGame = (app, options, team1, team2) => {
   return game;
 };
 
-const parseGameOptions = (app, game, options) => {
-  // start from defaults
-  Object.assign(game, app.settings.game);
-
+const parseGameOptions = (game, options) => {
   switch (options) {
     case "small":
       game.playerRadius = 16;
@@ -264,4 +253,33 @@ const parseGameOptions = (app, game, options) => {
       game.obstacleStartCount = 32;
       break;
   }
+};
+
+export const newPlayer = (game, uuid) => {
+  return {
+    uuid,
+    isAlive: true,
+    seen: 0,
+
+    team1: game.team1.has(uuid),
+    team2: game.team2.has(uuid),
+
+    position: game.team1.has(uuid) ? [...game.spawn1] : [...game.spawn2],
+    path: [],
+    moveSpeed: game.moveSpeed,
+
+    light: [[], []],
+
+    distanceToObj: 0,
+    advantage: true,
+
+    target: 0,
+    smoothedTargetAngle: 0,
+    smoothedTargetAngularVel: 0,
+
+    tick: [0, 0],
+    vector: game.all
+      .filter((otherUUID) => otherUUID !== uuid)
+      .map((uuid) => [uuid, 0]),
+  };
 };

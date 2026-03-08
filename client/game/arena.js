@@ -11,9 +11,11 @@ import { pushManyPathingObstacle, pushPathingObstacle } from "./pathing.js";
 export const initializeObstacles = (game, whenDone) => {
   const style = Math.random() < 0.5 ? mirrorAcrossMap : rotateAcrossMap;
 
-  const vary = (Math.random() * game.mapWidth) / 4;
-  game.team1Objective = [(11 * game.mapWidth) / 16 + vary, game.mapHeight / 2];
-  game.team2Objective = [(5 * game.mapWidth) / 16 - vary, game.mapHeight / 2];
+  const mean = 1 / 4;
+  const vary = 6;
+  const dist = mean + (2 * Math.random() - 1) / vary;
+  game.team1Objective = [game.mapWidth * (0.5 + dist), game.mapHeight / 2];
+  game.team2Objective = [game.mapWidth * (0.5 - dist), game.mapHeight / 2];
 
   setupObstacleBlockers(game, style);
 
@@ -86,6 +88,7 @@ export const newObstaclePreview = (game, socket) => {
   validateNewObstacle(game, game.previewObstacle);
 
   if (game.mouse.isClicking && game.previewObstacle.index !== -1) {
+    game.forceDrop.forEach((timeout) => clearTimeout(timeout));
     game.choosingObstacle = false;
     addObstacle(game, game.previewObstacle);
     return socket.json({

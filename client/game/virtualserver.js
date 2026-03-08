@@ -1,48 +1,34 @@
 import { packState, unpackState } from "./binary.js";
-import { registerHit, registerTeamHits } from "./hitreg.js";
+import { registerTeamHits } from "./hitreg.js";
 
-export const newVirtualServer = (game, app, team1, team2) => {
+export const newVirtualServer = (game, app) => {
   const { socket, stats } = app;
-  const HZ = 32;
+  const HZ = 64;
+  const { team1, team2, all, allInv, userId, player, players, playersMap } =
+    game;
 
-  const all = [...team1, ...team2];
-  all.sort();
-  const allInv = {};
-  all.forEach((uuid, index) => (allInv[uuid] = index));
+  const globalHistories = new Map(all.map((uuid) => [uuid, []]));
 
-  const localHistory = [];
-  const globalDead = new Set();
-  const globalStates = new Map();
-  const globalHistories = new Map();
-
-  const shots = new Set();
-
-  const virtualServer = { globalStates, shots, isStopped: true };
-
-  all.forEach((uuid) => {
-    if (uuid === game.userId) return;
-    globalStates.set(uuid, buildInitialState(game, all, team1, uuid));
-    globalHistories.set(uuid, []);
-  });
+  const virtualServer = { isStopped: true };
 
   // idempotent
   virtualServer.addState = (packedState) => {
     const { uuid, state } = unpackState(all, packedState);
-    if (globalDead.has(uuid)) return;
+    if (!player.isAlive) return;
     const tick = state.tick[1];
     if (tick < processedTick) return;
     const userHistory = globalHistories.get(uuid);
     const n = userHistory.length;
     if (n === 0) {
-      Object.assign(globalStates.get(uuid), structuredClone(state));
-      globalStates.get(uuid).seen = 0;
+      Object.assign(playersMap.get(uuid), structuredClone(state));
+      playersMap.get(uuid).seen = 0;
       userHistory.push(state);
       return;
     }
     const lastTick = userHistory[n - 1].tick[1];
     if (lastTick < tick) {
-      Object.assign(globalStates.get(uuid), structuredClone(state));
-      globalStates.get(uuid).seen = 0;
+      Object.assign(playersMap.get(uuid), structuredClone(state));
+      playersMap.get(uuid).seen = 0;
       userHistory.push(state);
       return;
     }
@@ -85,27 +71,30 @@ export const newVirtualServer = (game, app, team1, team2) => {
       stretchExp = invalpha * stretchExp + alpha * (tick - startTick);
 
       const vector = [];
-      for (const [uuid, { tick }] of globalStates.entries())
-        vector.push([uuid, tick[0]]);
+      for (const { type, tick, uuid } of players)
+        if (type === "online") vector.push([uuid, tick[0]]);
 
-      const time = performance.now() - virtualServer.startTime;
+      const time = performance.now() - game.startTime;
 
       const localState = {
         tick: [startTick, tick],
         vector,
-        position: [...game.playerPosition],
-        path: game.preRound ? [] : game.path,
-        light: [game.playerLight[0], game.playerLight[1]],
+        position: [...player.position],
+        path: player.path,
+        light: [player.light[0], player.light[1]],
+        moveSpeed: player.moveSpeed,
         time,
       };
 
-      if (!game.playerIsDead) localHistory.push(localState);
+      if (player.isAlive) globalHistories.get(userId).push(localState);
 
-      if (!game.playerIsDead && game.isMultiPlayer)
-        socket.send(packState(allInv, game.userId, localState));
+      if (player.isAlive && game.isMultiPlayer)
+        socket.send(packState(allInv, userId, localState));
     }
 
     while (processHistory());
+
+    const localHistory = globalHistories.get(userId);
 
     const lag =
       (localHistory[localHistory.length - 1]?.time ?? 0) -
@@ -131,20 +120,22 @@ export const newVirtualServer = (game, app, team1, team2) => {
   };
 
   const getLamportTick = (lamportTick) => {
-    for (const { tick } of globalStates.values())
-      lamportTick = tick[0] > lamportTick ? tick[0] : lamportTick;
+    for (const { tick, type } of players)
+      if (type === "online")
+        lamportTick = tick[0] > lamportTick ? tick[0] : lamportTick;
     return lamportTick;
   };
 
   let lastSpeculativeTick = 0;
   const getSpeculativeTick = (speculativeTick) => {
     let speculativeLag = 0;
-    for (const { tick, vector } of globalStates.values()) {
+    for (const { tick, vector, type } of players) {
+      if (type !== "online") continue;
       let self;
       let avg = tick[0];
       for (const [uuid, tick] of vector) {
         avg += tick;
-        if (uuid !== game.userId) continue;
+        if (uuid !== userId) continue;
         avg += 2 * tick;
         self = tick;
       }
@@ -153,27 +144,18 @@ export const newVirtualServer = (game, app, team1, team2) => {
     }
     if (speculativeLag <= 0) return speculativeTick;
 
-    speculativeLag = Math.floor(speculativeLag / globalStates.size);
+    speculativeLag = Math.floor(speculativeLag / (players.length - 1));
     lastSpeculativeTick = speculativeTick + speculativeLag;
     return speculativeTick + speculativeLag;
   };
 
   let processedTick = 1;
   const processHistory = () => {
-    if (
-      !game.playerIsDead &&
-      (!localHistory.length || localHistory[0].tick[0] > processedTick)
-    )
-      return false;
+    if (!globalHistories.size) return false;
     for (const history of globalHistories.values())
       if (!history.length || history[0].tick[0] > processedTick) return false;
 
-    if (!localHistory.length && !globalHistories.size) return false;
-
     const tickSlice = [];
-    if (!game.playerIsDead)
-      tickSlice.push({ ...localHistory[0], uuid: game.userId });
-
     for (const [uuid, history] of globalHistories.entries())
       tickSlice.push({ ...history[0], uuid });
 
@@ -181,8 +163,6 @@ export const newVirtualServer = (game, app, team1, team2) => {
     let min = Number.MAX_SAFE_INTEGER;
     for (const state of tickSlice) min = Math.min(state.tick[1], min);
 
-    if (!game.playerIsDead && localHistory[0].tick[1] === min)
-      localHistory.shift();
     for (const history of globalHistories.values())
       if (history[0].tick[1] === min) history.shift();
 
@@ -208,46 +188,28 @@ export const newVirtualServer = (game, app, team1, team2) => {
     if (!newShots.length) return;
 
     for (const shot of newShots) {
-      shots.add(shot);
-      globalStates.delete(shot.killed);
+      game.shots.add(shot);
+      playersMap.get(shot.killed).isAlive = false;
       globalHistories.delete(shot.killed);
-      globalDead.add(shot.killed);
-      if (shot.killed !== game.userId) continue;  
-      
-      localHistory.length = 0;
-      game.playerIsDead = true;
     }
 
     socket.json({ command: "new shots", newShots, tick });
   };
 
   virtualServer.updatePlayers = (team1, team2) => {
-    const currentPlayers = Array.from(globalStates.keys());
+    const currentPlayers = all;
     for (const player of currentPlayers) {
       if (team1.has(player)) continue;
       if (team2.has(player)) continue;
-      globalStates.delete(player);
       globalHistories.delete(player);
-      globalDead.add(player);
     }
   };
 
   virtualServer.start = () => {
-    virtualServer.startTime = performance.now();
-    lastHeadroomTime = virtualServer.startTime;
+    lastHeadroomTime = game.startTime;
     virtualServer.isStopped = false;
     nextTick();
   };
 
   return virtualServer;
 };
-
-const buildInitialState = (game, all, team1, uuid) => ({
-  tick: [0, 0],
-  vector: all
-    .filter((otherUUID) => otherUUID !== uuid)
-    .map((uuid) => [uuid, 0]),
-  position: team1.has(uuid) ? [...game.spawn1] : [...game.spawn2],
-  path: [],
-  light: [[], []],
-});

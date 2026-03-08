@@ -1,4 +1,5 @@
 import { createBulletWarpPostFX } from "./bulletwarp.js";
+import { shifts } from "./hitreg.js";
 import { createTeamsVisionRenderer } from "./lightrendering.js";
 import { filletPolyline } from "./pathsmoothing.js";
 import { createPlayerRenderer } from "./playerrendering.js";
@@ -36,17 +37,9 @@ export const render = (game, team1, team2) => {
   renderTeamLights(game, team1Lights, team2Lights, color, renderSettings);
   renderMouseDot(ctx, game, isTeam1, color, playerRadius);
 
-  if (game.isMultiPlayer) multiPlayerRender(game, ctx, team1, isTeam1);
-  else singlePlayerRender(game, ctx, team1, isTeam1);
-};
+  renderPlayerPath(ctx, game, isTeam1, color, playerRadius);
 
-const singlePlayerRender = (game, ctx, team1, isTeam1) => {
-  const { color, playerRadius, mapWidth, mapHeight, renderSettings } = game;
-  if (!game.playerIsDead) {
-    renderPlayerPath(ctx, game, isTeam1, color, playerRadius);
-    renderLocalPlayer(game, isTeam1);
-  }
-  renderBots(game, team1);
+  renderPlayers(game, isTeam1);
 
   renderObjectiveIfNeeded(
     game,
@@ -56,64 +49,59 @@ const singlePlayerRender = (game, ctx, team1, isTeam1) => {
     mapHeight,
     renderSettings,
   );
-
   renderShotsAndWarp(game, ctx, game.shots, playerRadius);
 };
 
-const renderBots = (game, team1) => {
+const renderPlayers = (game, ctx, team1) => {
   const { color, playerRadius, renderSettings } = game;
 
-  for (const state of game.bots) {
-    const uuid = state.uuid;
-    const isTeam1 = team1.has(uuid);
-
-    const target = state.target?.[0];
-    const hasAdvantage = state.advantage;
+  for (const player of game.players) {
+    if (!player.isAlive) continue;
+    const isTeam1 = player.team1;
 
     const playerColor = isTeam1 ? color.team1Player : color.team2Player;
     const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
     const gunColorSwapped = isTeam1 ? color.team2Gun : color.team1Gun;
-    const gunColor = !hasAdvantage ? gunColorSwapped : gunColorNormal;
+    const gunColor = !player.advantage ? gunColorSwapped : gunColorNormal;
 
     const glowColorNormal = isTeam1 ? color.team1Disk : color.team2Disk;
     const glowColorSwapped = isTeam1 ? color.team2Disk : color.team1Disk;
-    const glowColor = !hasAdvantage ? glowColorSwapped : glowColorNormal;
+    const glowColor = !player.advantage ? glowColorSwapped : glowColorNormal;
+    const glowParam = renderSettings.glowEnabled
+      ? {
+          glowRadius: playerRadius / 1.25,
+          glowColor: glowColor,
+          composite: "screen",
+        }
+      : null;
 
     game.drawPlayer(
-      state.position,
+      player.position,
       playerRadius,
       playerColor,
       gunColor,
-      target,
-      renderSettings.glowEnabled
-        ? {
-            glowRadius: playerRadius / 1.25,
-            glowColor: glowColor,
-            composite: "screen",
-          }
-        : null,
+      player.target,
+      glowParam,
     );
   }
 };
 
-const multiPlayerRender = (game, ctx, team1, isTeam1) => {
-  const { renderSettings, color, mapWidth, mapHeight, playerRadius } = game;
-  if (!game.playerIsDead) {
-    renderPlayerPath(ctx, game, isTeam1, color, playerRadius);
-    renderLocalPlayer(game, isTeam1);
+const renderBotsDebug = (game, ctx, team1) => {
+  for (const state of game.players) {
+    if (state.type !== "bot") continue;
+    shifts.forEach(([x, y]) => {
+      ctx.fillStyle = playerColor;
+      ctx.beginPath();
+      ctx.rect(
+        state.position[0] + (x * game.mapHeight) / 2,
+        state.position[1] + (y * game.mapHeight) / 2,
+        5,
+        5,
+      );
+      ctx.closePath();
+      ctx.fill();
+    });
   }
-
-  renderGlobalPlayers(game, team1);
-  renderObjectiveIfNeeded(
-    game,
-    color,
-    playerRadius,
-    mapWidth,
-    mapHeight,
-    renderSettings,
-  );
-
-  renderShotsAndWarp(game, ctx, game.virtualServer.shots, playerRadius);
 };
 
 const applyXSwap = (game, team1, team2, isTeam1) => {
@@ -197,9 +185,10 @@ function strokeFilletedPath(ctx, points, R) {
 }
 
 const renderPlayerPath = (ctx, game, isTeam1, color, playerRadius) => {
-  if (game.path.length <= 0) return;
+  const player = game.player;
+  if (!player.isAlive || player.path.length <= 0) return;
 
-  const alpha = computePathAlpha(game.path, playerRadius);
+  const alpha = computePathAlpha(player.path, playerRadius);
   if (alpha <= 0) return;
 
   ctx.save();
@@ -219,10 +208,10 @@ const renderPlayerPath = (ctx, game, isTeam1, color, playerRadius) => {
 
   // path
   ctx.beginPath();
-  strokeFilletedPath(ctx, game.path, playerRadius);
+  strokeFilletedPath(ctx, player.path, playerRadius);
 
   // final position
-  const last = game.path[game.path.length - 1];
+  const last = player.path[player.path.length - 1];
   if (last) {
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
@@ -258,72 +247,6 @@ const computePathAlpha = (path, playerRadius) => {
   return MIN_ALPHA + t * (MAX_ALPHA - MIN_ALPHA);
 };
 
-const renderLocalPlayer = (game, isTeam1) => {
-  const { color, playerRadius, renderSettings, playerPosition } = game;
-
-  const target = game.playerTarget?.[0];
-  const hasAdvantage = game.advantage;
-
-  const playerColor = isTeam1 ? color.team1Player : color.team2Player;
-  const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
-  const gunColorSwapped = isTeam1 ? color.team2Gun : color.team1Gun;
-  const gunColor = !hasAdvantage ? gunColorSwapped : gunColorNormal;
-
-  const glowColorNormal = isTeam1 ? color.team1Disk : color.team2Disk;
-  const glowColorSwapped = isTeam1 ? color.team2Disk : color.team1Disk;
-  const glowColor = !hasAdvantage ? glowColorSwapped : glowColorNormal;
-
-  game.drawPlayer(
-    playerPosition,
-    playerRadius,
-    playerColor,
-    gunColor,
-    target,
-    renderSettings.glowEnabled
-      ? {
-          glowRadius: playerRadius / 1.25,
-          glowColor: glowColor,
-          composite: "screen",
-        }
-      : null,
-  );
-};
-
-const renderGlobalPlayers = (game, team1) => {
-  const { color, playerRadius, renderSettings } = game;
-
-  for (const [uuid, state] of game.virtualServer.globalStates.entries()) {
-    const isTeam1 = team1.has(uuid);
-
-    const target = state.target?.[0];
-    const hasAdvantage = state.advantage;
-
-    const playerColor = isTeam1 ? color.team1Player : color.team2Player;
-    const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
-    const gunColorSwapped = isTeam1 ? color.team2Gun : color.team1Gun;
-    const gunColor = !hasAdvantage ? gunColorSwapped : gunColorNormal;
-
-    const glowColorNormal = isTeam1 ? color.team1Disk : color.team2Disk;
-    const glowColorSwapped = isTeam1 ? color.team2Disk : color.team1Disk;
-    const glowColor = !hasAdvantage ? glowColorSwapped : glowColorNormal;
-
-    game.drawPlayer(
-      state.position,
-      playerRadius,
-      playerColor,
-      gunColor,
-      target,
-      renderSettings.glowEnabled
-        ? {
-            glowRadius: playerRadius / 1.25,
-            glowColor: glowColor,
-            composite: "screen",
-          }
-        : null,
-    );
-  }
-};
-
 const renderObjectiveIfNeeded = (
   game,
   color,
@@ -332,10 +255,7 @@ const renderObjectiveIfNeeded = (
   mapHeight,
   renderSettings,
 ) => {
-  const startTime = game.isMultiPlayer
-    ? game.virtualServer.startTime
-    : game.startTime;
-  const time = (performance.now() - startTime) / 1000;
+  const time = (performance.now() - game.startTime) / 1000;
   const timeAlpha = Math.min(1, Math.max(0, (time - 30) / 30) ** 3);
   if (timeAlpha >= 1) return;
 
@@ -427,7 +347,7 @@ const renderObstaclePreviewScene = (
 
   // spawns + center objective + freeze-frame shots
   drawPreviewSpawnsAndObjective(game, ctx, color, renderSettings);
-  if (game.isMultiPlayer) drawPreviewShots(game, ctx, color, renderSettings);
+  drawPreviewShots(game, ctx, color, renderSettings);
 
   // warpFX with no bullets
   game.warpFX.render({
@@ -507,75 +427,73 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
 const drawPreviewShots = (game, ctx, color, renderSettings) => {
   const playerRadius = game.playerRadius;
 
-  game.virtualServer.shots.forEach(
-    ({ team1, killerPosition, killedPosition, hit }) => {
-      // logical → visual team mapping
-      const isTeam1Visual = game.xSwap ? !team1 : team1;
+  game.shots.forEach(({ team1, killerPosition, killedPosition, hit }) => {
+    // logical → visual team mapping
+    const isTeam1Visual = game.xSwap ? !team1 : team1;
 
-      // killer (visual team)
-      const killerBodyColor = isTeam1Visual
-        ? color.team1Player
-        : color.team2Player;
-      const killerGunColor = isTeam1Visual ? color.team1Gun : color.team2Gun;
-      const killerGlowColor = isTeam1Visual ? color.team1Disk : color.team2Disk;
+    // killer (visual team)
+    const killerBodyColor = isTeam1Visual
+      ? color.team1Player
+      : color.team2Player;
+    const killerGunColor = isTeam1Visual ? color.team1Gun : color.team2Gun;
+    const killerGlowColor = isTeam1Visual ? color.team1Disk : color.team2Disk;
 
-      const killerAngle = Math.atan2(
-        hit[1] - killerPosition[1],
-        hit[0] - killerPosition[0],
-      );
+    const killerAngle = Math.atan2(
+      hit[1] - killerPosition[1],
+      hit[0] - killerPosition[0],
+    );
 
-      game.drawPlayer(
-        killerPosition,
-        playerRadius,
-        killerBodyColor,
-        killerGunColor,
-        killerAngle,
-        renderSettings.glowEnabled
-          ? {
-              glowRadius: playerRadius / 1.25,
-              glowColor: killerGlowColor,
-              composite: "screen",
-            }
-          : null,
-      );
+    game.drawPlayer(
+      killerPosition,
+      playerRadius,
+      killerBodyColor,
+      killerGunColor,
+      killerAngle,
+      renderSettings.glowEnabled
+        ? {
+            glowRadius: playerRadius / 1.25,
+            glowColor: killerGlowColor,
+            composite: "screen",
+          }
+        : null,
+    );
 
-      // killed (opposite visual team)
-      const killedBodyColor = isTeam1Visual
-        ? color.team2Player
-        : color.team1Player;
-      const killedGunColor = isTeam1Visual ? color.team2Gun : color.team1Gun;
-      const killedGlowColor = isTeam1Visual ? color.team2Disk : color.team1Disk;
+    // killed (opposite visual team)
+    const killedBodyColor = isTeam1Visual
+      ? color.team2Player
+      : color.team1Player;
+    const killedGunColor = isTeam1Visual ? color.team2Gun : color.team1Gun;
+    const killedGlowColor = isTeam1Visual ? color.team2Disk : color.team1Disk;
 
-      const killedAngle = Math.atan2(
-        killerPosition[1] - killedPosition[1],
-        killerPosition[0] - killedPosition[0],
-      );
+    const killedAngle = Math.atan2(
+      killerPosition[1] - killedPosition[1],
+      killerPosition[0] - killedPosition[0],
+    );
 
-      game.drawPlayer(
-        killedPosition,
-        playerRadius,
-        killedBodyColor,
-        killedGunColor,
-        killedAngle,
-        renderSettings.glowEnabled
-          ? {
-              glowRadius: playerRadius / 1.25,
-              glowColor: killedGlowColor,
-              composite: "screen",
-            }
-          : null,
-      );
+    game.drawPlayer(
+      killedPosition,
+      playerRadius,
+      killedBodyColor,
+      killedGunColor,
+      killedAngle,
+      renderSettings.glowEnabled
+        ? {
+            glowRadius: playerRadius / 1.25,
+            glowColor: killedGlowColor,
+            composite: "screen",
+          }
+        : null,
+    );
 
-      // shot line (from killer’s visual team)
-      ctx.strokeStyle = isTeam1Visual ? color.team1Gun : color.team2Gun;
-      ctx.lineWidth = (2 * playerRadius) / 5;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(...killerPosition);
-      ctx.lineTo(...hit);
-      ctx.stroke();
-    },
-  );
+    // shot line (from killer’s visual team)
+    ctx.strokeStyle = isTeam1Visual ? color.team1Gun : color.team2Gun;
+    ctx.lineWidth = (2 * playerRadius) / 5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(...killerPosition);
+    ctx.lineTo(...hit);
+    ctx.stroke();
+  });
 };
 
 const newGameCanvases = (game, scale, mapWidth, mapHeight) => {
