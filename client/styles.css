@@ -182,3 +182,18 @@ button:active {
   color: var(--light);
   pointer-events: none;
 }
+
+#Console {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  width: 768px;
+  height: 512px;
+
+  transform: translate(-50%, -50%);
+
+  background: var(--dark);
+  color: var(--light);
+}

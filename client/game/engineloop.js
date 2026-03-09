@@ -15,7 +15,7 @@ const stages = [
   [2, true],
 ];
 
-export const startEngine = (game, app, team1, team2) => {
+export const startEngine = (game, app) => {
   const { renderSettings } = game;
 
   let diag = false;
@@ -99,13 +99,13 @@ export const startEngine = (game, app, team1, team2) => {
     diagnostic(deltaMs);
 
     try {
-      update(game, app, delta, team1, team2);
+      update(game, app, delta);
     } catch (err) {
       console.error("ENGINE UPDATE ERROR:", err);
     }
 
     try {
-      render(game, team1, team2);
+      render(game);
     } catch (err) {
       console.error("ENGINE RENDER ERROR:", err);
     }

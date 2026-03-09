@@ -424,19 +424,20 @@ export class VisibilityGraph {
     if (util.dirLooselyInsideInteriorCone(cone, origin, directionAt, this._EPS))
       return origin;
 
-    const vertexVisibility = this.getVertexVisibility(index);
+    const vis = this.getVertexVisibility(index);
 
     angle = util.wrapToPi(angle);
-    let angularIndex = 0;
-    while (angularIndex < vertexVisibility.length) {
-      if (angle <= vertexVisibility[angularIndex].curr.angle) break;
-      angularIndex++;
+    let low = 0;
+    let high = vis.length;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (vis[mid].curr.angle <= angle) low = mid + 1;
+      else high = mid;
     }
-    angularIndex += vertexVisibility.length - 1;
-    angularIndex %= vertexVisibility.length;
+    let angularIndex = low - 1;
+    if (angularIndex < 0) angularIndex = vis.length - 1;
 
-    const endCap = vertexVisibility[angularIndex].endCap;
-
+    const endCap = vis[angularIndex].endCap;
     if (endCap.doesNotHit)
       return [origin[0] + dir[0] * maxDist, origin[1] + dir[1] * maxDist];
 
@@ -444,7 +445,7 @@ export class VisibilityGraph {
     return [origin[0] + dir[0] * t, origin[1] + dir[1] * t];
   }
 
-  // Cast a ray from `origin` at `angle`; return first boundary hit (or the far endpoint).
+  // This is expensive, if possible prefer vertexRaycast as it is O(n)
   raycast(origin, angle, maxDist = 4e4) {
     const dir = [Math.cos(angle), Math.sin(angle)];
     let bestT = maxDist;
@@ -485,7 +486,6 @@ export class VisibilityGraph {
     const result = [];
     for (let j = 0; j < this.vertices.length; j++) {
       if (this._occluded[j]) continue;
-      if (util.ptEq(pos, this.vertices[j], this._EPS)) continue;
       if (this.visibleFromPointToVertex(pos, j)) result.push(j);
     }
     return result;

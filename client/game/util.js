@@ -1,3 +1,125 @@
+/**
+ * 2D vector or point.
+ *
+ * @typedef {[number, number]} Vec2
+ */
+
+/**
+ * 3D vector or point.
+ *
+ * @typedef {[number, number, number]} Vec3
+ */
+
+/**
+ * Axis-aligned bounding box (AABB).
+ *
+ * @typedef {Object} BBox
+ * @property {number} minX Minimum x coordinate.
+ * @property {number} minY Minimum y coordinate.
+ * @property {number} maxX Maximum x coordinate.
+ * @property {number} maxY Maximum y coordinate.
+ */
+
+/**
+ * Minimal cone descriptor used for geometric visibility checks.
+ *
+ * Represents the oriented wedge formed by the two edges incident to a vertex.
+ * Often used for interior-cone tests.
+ *
+ * @typedef {Object} VertexConeBasic
+ * @property {Vec2} vPrev Vector from the vertex → previous vertex.
+ * @property {Vec2} vNext Vector from the vertex → next vertex.
+ * @property {number} s Orientation sign of the ring (+1 CCW, -1 CW).
+ */
+
+/**
+ * Descriptor for the visibility cone at a polygon vertex.
+ *
+ * @typedef {Object} VertexCone
+ * @property {Vec2} vPrev Vector from the vertex → previous vertex.
+ * @property {Vec2} vNext Vector from the vertex → next vertex.
+ * @property {number} s Ring orientation sign (+1 for CCW, -1 for CW).
+ * @property {number} w Interior angle width in radians (0..2π).
+ * @property {boolean} reflex True if the vertex is reflex (> π interior angle).
+ * @property {number} aPrev Polar angle of `vPrev` (radians).
+ * @property {number} aNext Polar angle of `vNext` (radians).
+ */
+
+/**
+ * State object used for grid ray traversal (Amanatides–Woo DDA).
+ *
+ * Represents the current position of a ray walking through a uniform
+ * spatial grid. The ray is parameterized as:
+ *
+ *   P(t) = (x0, y0) + t * (dx, dy)
+ *
+ * Fields:
+ * - `(cx, cy)` : current grid cell indices
+ * - `stepX/Y`  : direction of cell stepping (-1, 0, or 1)
+ * - `tMaxX/Y`  : parametric t value where the ray next crosses a grid boundary
+ * - `tDeltaX/Y`: parametric distance between successive grid crossings
+ * - `tEnter`   : parametric t where the ray entered the current cell
+ * - `tMax`     : maximum allowed t before traversal stops
+ *
+ * The object is **mutable** and intended to be repeatedly updated by
+ * `advanceRayWalk`.
+ *
+ * @typedef {Object} RayWalkState
+ * @property {number} x0 Ray origin x coordinate
+ * @property {number} y0 Ray origin y coordinate
+ * @property {number} dx Ray direction x component
+ * @property {number} dy Ray direction y component
+ * @property {number} cx Current grid cell x index
+ * @property {number} cy Current grid cell y index
+ * @property {number} stepX Grid step direction in x (-1,0,1)
+ * @property {number} stepY Grid step direction in y (-1,0,1)
+ * @property {number} tMaxX Parametric t where ray next crosses vertical grid line
+ * @property {number} tMaxY Parametric t where ray next crosses horizontal grid line
+ * @property {number} tDeltaX Parametric t distance between vertical crossings
+ * @property {number} tDeltaY Parametric t distance between horizontal crossings
+ * @property {number} tEnter Parametric t where the ray entered the current cell
+ * @property {number} tMax Maximum parametric distance to walk
+ */
+
+/**
+ * A polygon represented as an ordered list of 2D vertices.
+ *
+ * The polygon is *not required* to repeat the first vertex at the end.
+ * Edges are implicitly defined between consecutive vertices:
+ *
+ *   v[i] → v[i+1]
+ *
+ * and optionally the closing edge:
+ *
+ *   v[n-1] → v[0]
+ *
+ * depending on the algorithm consuming the polygon.
+ *
+ * Orientation (CW/CCW) depends on the producing function.
+ *
+ * @typedef {Vec2[]} Polygon
+ */
+
+/**
+ * A polygon whose boundary is explicitly closed.
+ *
+ * The final vertex is guaranteed to equal the first vertex:
+ *
+ *   poly[0] === poly[poly.length - 1]
+ *
+ * This representation is commonly used for:
+ * - drawing paths
+ * - geometric clipping
+ * - rasterization
+ * - algorithms that expect explicit boundary loops
+ *
+ * Minimum length is 4 for a triangle:
+ *
+ *   [v0, v1, v2, v0]
+ *
+ * @typedef {Vec2[]} ClosedPolygon
+ */
+
 /** Circle constant: τ = 2π (full turn in radians). */
 const TAU = Math.PI * 2;
 
@@ -11,12 +133,6 @@ const TAU = Math.PI * 2;
  * @returns {number} Equivalent angle in [-Math.PI, Math.PI).
  */
 const wrapToPi = (x) => ((((x + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
-
-/**
- * 2D vector or point.
- *
- * @typedef {[number, number]} Vec2
- */
 
 /**
  * Signed orientation of the triple (p1, p2, p3), returned as -1/0/+1.
@@ -369,16 +485,6 @@ const raySegParamT = (O, d, C, D, eps) => {
 };
 
 /**
- * Axis-aligned bounding box (AABB).
- *
- * @typedef {Object} BBox
- * @property {number} minX Minimum x coordinate.
- * @property {number} minY Minimum y coordinate.
- * @property {number} maxX Maximum x coordinate.
- * @property {number} maxY Maximum y coordinate.
- */
-
-/**
  * Computes the parametric entry and exit distances of a ray with an axis-aligned bounding box.
  *
  * The ray is defined as:
@@ -431,18 +537,6 @@ const rayAABBEntryExit = (O, d, bbox, eps = 1e-12) => {
   const tExit = tmax;
   return { tEnter, tExit };
 };
-
-/**
- * Minimal cone descriptor used for geometric visibility checks.
- *
- * Represents the oriented wedge formed by the two edges incident to a vertex.
- * Often used for interior-cone tests.
- *
- * @typedef {Object} VertexConeBasic
- * @property {Vec2} vPrev Vector from the vertex → previous vertex.
- * @property {Vec2} vNext Vector from the vertex → next vertex.
- * @property {number} s Orientation sign of the ring (+1 CCW, -1 CW).
- */
 
 /**
  * Tests whether the direction from `curr` toward `target` lies inside
@@ -702,19 +796,6 @@ const signedArea = (points) => {
 };
 
 /**
- * Descriptor for the visibility cone at a polygon vertex.
- *
- * @typedef {Object} VertexCone
- * @property {Vec2} vPrev Vector from the vertex → previous vertex.
- * @property {Vec2} vNext Vector from the vertex → next vertex.
- * @property {number} s Ring orientation sign (+1 for CCW, -1 for CW).
- * @property {number} w Interior angle width in radians (0..2π).
- * @property {boolean} reflex True if the vertex is reflex (> π interior angle).
- * @property {number} aPrev Polar angle of `vPrev` (radians).
- * @property {number} aNext Polar angle of `vNext` (radians).
- */
-
-/**
  * Computes geometric "visibility cones" for each vertex of a polygon ring.
  *
  * For each vertex `v`, the cone describes the angular region of the polygon
@@ -771,42 +852,6 @@ const computeVertexCones = (ring, s) => {
 
   return cones;
 };
-
-/**
- * State object used for grid ray traversal (Amanatides–Woo DDA).
- *
- * Represents the current position of a ray walking through a uniform
- * spatial grid. The ray is parameterized as:
- *
- *   P(t) = (x0, y0) + t * (dx, dy)
- *
- * Fields:
- * - `(cx, cy)` : current grid cell indices
- * - `stepX/Y`  : direction of cell stepping (-1, 0, or 1)
- * - `tMaxX/Y`  : parametric t value where the ray next crosses a grid boundary
- * - `tDeltaX/Y`: parametric distance between successive grid crossings
- * - `tEnter`   : parametric t where the ray entered the current cell
- * - `tMax`     : maximum allowed t before traversal stops
- *
- * The object is **mutable** and intended to be repeatedly updated by
- * `advanceRayWalk`.
- *
- * @typedef {Object} RayWalkState
- * @property {number} x0 Ray origin x coordinate
- * @property {number} y0 Ray origin y coordinate
- * @property {number} dx Ray direction x component
- * @property {number} dy Ray direction y component
- * @property {number} cx Current grid cell x index
- * @property {number} cy Current grid cell y index
- * @property {number} stepX Grid step direction in x (-1,0,1)
- * @property {number} stepY Grid step direction in y (-1,0,1)
- * @property {number} tMaxX Parametric t where ray next crosses vertical grid line
- * @property {number} tMaxY Parametric t where ray next crosses horizontal grid line
- * @property {number} tDeltaX Parametric t distance between vertical crossings
- * @property {number} tDeltaY Parametric t distance between horizontal crossings
- * @property {number} tEnter Parametric t where the ray entered the current cell
- * @property {number} tMax Maximum parametric distance to walk
- */
 
 /**
  * Initializes a grid-based ray traversal state using
@@ -979,6 +1024,725 @@ const walkGridCells = (a, b, cs, visitCell) => {
 };
 
 /**
+ * Normalizes a 2D vector.
+ *
+ * Behavior:
+ * - Returns a unit-length vector in the same direction as `v`.
+ * - If `v` has zero length, returns `[0,0]`.
+ *
+ * @param {Vec2} v
+ * Input vector.
+ *
+ * @returns {Vec2}
+ * Unit vector pointing in the same direction as `v`,
+ * or `[0,0]` if the input has zero length.
+ */
+const normalize = (v) => {
+  const L = Math.hypot(v[0], v[1]);
+  return L === 0 ? [0, 0] : [v[0] / L, v[1] / L];
+};
+
+/**
+ * Computes the outward unit normal of a directed edge.
+ *
+ * The edge is defined from `a → b`.
+ * The returned vector is perpendicular to the edge and rotated
+ * 90° clockwise relative to the edge direction.
+ *
+ * Behavior:
+ * - The edge direction is `t = b - a`.
+ * - The raw normal is `[t_y, -t_x]`.
+ * - The result is normalized to unit length.
+ * - Zero-length edges return `[0,0]`.
+ *
+ * Typical usage:
+ * - Polygon offsetting
+ * - Minkowski sums
+ * - edge extrusion operations
+ *
+ * @param {Vec2} a
+ * Edge start vertex.
+ *
+ * @param {Vec2} b
+ * Edge end vertex.
+ *
+ * @returns {Vec2}
+ * Unit outward normal vector.
+ */
+const outwardNormal = (a, b) => {
+  const tx = b[0] - a[0];
+  const ty = b[1] - a[1];
+  if (tx === 0 && ty === 0) return [0, 0];
+  return normalize([ty, -tx]);
+};
+
+/**
+ * Applies a rigid transform to a list of points.
+ *
+ * The transform consists of:
+ * - rotation about the origin by angle `theta`
+ * - translation by `(tx, ty)`
+ *
+ * Transformation:
+ *   p' = R(theta) * p + t
+ *
+ * Behavior:
+ * - Rotation is applied first.
+ * - Translation is applied second.
+ * - The input array is not modified.
+ *
+ * @param {Vec2[]} points
+ * Input points.
+ *
+ * @param {Vec2} translation
+ * Translation vector `[tx, ty]`.
+ *
+ * @param {number} theta
+ * Rotation angle in radians.
+ *
+ * @returns {Vec2[]}
+ * Transformed points.
+ */
+const transformPoints = (points, [tx, ty], theta) => {
+  const cosT = Math.cos(theta);
+  const sinT = Math.sin(theta);
+
+  return points.map(([x, y]) => [
+    x * cosT - y * sinT + tx,
+    x * sinT + y * cosT + ty,
+  ]);
+};
+
+/**
+ * Computes the positive CCW angular difference from `a0` to `a1`.
+ *
+ * The result represents the amount of counter-clockwise rotation
+ * required to move from angle `a0` to angle `a1`.
+ *
+ * Range:
+ *   result ∈ (0, 2π]
+ *
+ * Behavior:
+ * - Angles are first normalized to the unit circle.
+ * - If `a1` lies clockwise from `a0`, the result wraps across `2π`.
+ *
+ * Example:
+ *   a0 = 350° , a1 = 10°  →  20°
+ *
+ * @param {number} a0
+ * Starting angle in radians.
+ *
+ * @param {number} a1
+ * Target angle in radians.
+ *
+ * @returns {number}
+ * Positive CCW angular difference.
+ */
+const ccwAngleDelta = (a0, a1) => {
+  a0 = Math.atan2(Math.sin(a0), Math.cos(a0));
+  a1 = Math.atan2(Math.sin(a1), Math.cos(a1));
+
+  let d = a1 - a0;
+  if (d <= 0) d += TAU;
+  return d;
+};
+
+/**
+ * Clamps a scalar value to the interval [0,1].
+ *
+ * @param {number} x
+ * Input value.
+ *
+ * @returns {number}
+ * Clamped value.
+ */
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+/**
+ * Cubic smoothstep interpolation function.
+ *
+ * Maps an input `u ∈ [0,1]` to a smooth curve that starts
+ * and ends with zero derivative.
+ *
+ * Formula:
+ *   f(u) = u² (3 − 2u)
+ *
+ * Properties:
+ * - f(0) = 0
+ * - f(1) = 1
+ * - f'(0) = f'(1) = 0
+ *
+ * Widely used for:
+ * - animation easing
+ * - procedural generation
+ * - interpolation weights
+ *
+ * @param {number} u
+ * Input parameter.
+ *
+ * @returns {number}
+ * Smoothstep interpolation value.
+ */
+const smoothstep = (u) => u * u * (3 - 2 * u);
+
+/**
+ * Linearly interpolates between two 3-component vectors.
+ *
+ * The interpolation parameter `t` is not clamped.
+ *
+ * Formula:
+ *   mix(a,b,t) = (1−t)a + tb
+ *
+ * @param {Vec3} a
+ * First vector.
+ *
+ * @param {Vec3} b
+ * Second vector.
+ *
+ * @param {number} t
+ * Interpolation parameter.
+ *
+ * @returns {Vec3}
+ * Interpolated vector.
+ */
+const mix3 = (a, b, t) => [
+  (1 - t) * a[0] + t * b[0],
+  (1 - t) * a[1] + t * b[1],
+  (1 - t) * a[2] + t * b[2],
+];
+
+/**
+ * Builds an axis-aligned rectangular boundary polygon from its sides.
+ *
+ * The rectangle is returned in clockwise order starting from the
+ * top-left corner:
+ *   [left, top] → [right, top] → [right, bottom] → [left, bottom]
+ *
+ * The polygon is not explicitly closed; the first vertex is not repeated
+ * at the end.
+ *
+ * @param {number} left
+ * Left x-coordinate.
+ *
+ * @param {number} top
+ * Top y-coordinate.
+ *
+ * @param {number} right
+ * Right x-coordinate.
+ *
+ * @param {number} bottom
+ * Bottom y-coordinate.
+ *
+ * @returns {Polygon}
+ * Four-vertex rectangle polygon.
+ */
+const buildBoundaryRect = (left, top, right, bottom) => [
+  [left, top],
+  [right, top],
+  [right, bottom],
+  [left, bottom],
+];
+
+/**
+ * Builds a closed axis-aligned square centered at a given point.
+ *
+ * The square extends `size` units in the positive and negative x/y
+ * directions from the center, so its total width and height are `2 * size`.
+ *
+ * The returned polygon is explicitly closed by repeating the first
+ * vertex as the final vertex.
+ *
+ * @param {Vec2} center
+ * Center point of the square.
+ *
+ * @param {number} [size=1]
+ * Half-size of the square.
+ *
+ * @returns {ClosedPolygon}
+ * Closed square polygon.
+ */
+const squareAt = ([cx, cy], size = 1) => [
+  [cx - size, cy - size],
+  [cx + size, cy - size],
+  [cx + size, cy + size],
+  [cx - size, cy + size],
+  [cx - size, cy - size],
+];
+
+/**
+ * Builds a closed rectangle centered on the segment from `c` to `d`.
+ *
+ * The rectangle's long axis lies along the line from `c` to `d`, and its
+ * short axis is perpendicular to that line. Its total thickness is `2`
+ * units, i.e. half-height `1`.
+ *
+ * This is useful for drawing a "bar" or thick segment between two points.
+ *
+ * Degenerate case:
+ * - If the input points coincide, the function returns `squareAt(c)`.
+ *
+ * The returned polygon is explicitly closed by repeating the first
+ * vertex as the final vertex.
+ *
+ * @param {Vec2} c
+ * Start point / first endpoint.
+ *
+ * @param {Vec2} d
+ * End point / second endpoint.
+ *
+ * @returns {ClosedPolygon}
+ * Closed rectangle polygon spanning the two points.
+ */
+const crossbarsAt = ([cx, cy], [dx, dy]) => {
+  let vx = dx - cx;
+  let vy = dy - cy;
+  const len = Math.hypot(vx, vy);
+
+  // Degenerate case: points coincide → just draw the 2x2 square
+  if (len === 0) return squareAt([cx, cy]);
+
+  // Unit direction from c → d
+  vx /= len;
+  vy /= len;
+
+  // Perpendicular unit vector
+  const nx = -vy;
+  const ny = vx;
+
+  // Rectangle parameters
+  const halfWidth = len / 2; // along the line between the points
+  const halfHeight = 1; // total height = 2
+
+  // Center at midpoint between the two points
+  const mx = (cx + dx) / 2;
+  const my = (cy + dy) / 2;
+
+  // Four corners (counter-clockwise) and close the polygon
+  const p1 = [
+    mx - vx * halfWidth - nx * halfHeight,
+    my - vy * halfWidth - ny * halfHeight,
+  ];
+  const p2 = [
+    mx + vx * halfWidth - nx * halfHeight,
+    my + vy * halfWidth - ny * halfHeight,
+  ];
+  const p3 = [
+    mx + vx * halfWidth + nx * halfHeight,
+    my + vy * halfWidth + ny * halfHeight,
+  ];
+  const p4 = [
+    mx - vx * halfWidth + nx * halfHeight,
+    my - vy * halfWidth + ny * halfHeight,
+  ];
+
+  return [p1, p2, p3, p4, p1];
+};
+
+/**
+ * Inclusive point-in-polygon test for an explicitly closed polygon.
+ *
+ * Behavior:
+ * - Returns true if the point lies strictly inside the polygon.
+ * - Returns true if the point lies on any boundary edge.
+ * - Returns false only when the point is strictly outside.
+ *
+ * Assumptions:
+ * - `poly` is a closed polygon, meaning `poly[0] === poly[poly.length - 1]`.
+ * - Minimum valid closed polygon length is 4, e.g. `[v0, v1, v2, v0]`.
+ *
+ * Implementation:
+ * - First checks each boundary segment using `onSegment`.
+ * - Then applies an even-odd ray crossing test.
+ *
+ * @param {Vec2} p
+ * Point to test.
+ *
+ * @param {ClosedPolygon} poly
+ * Explicitly closed polygon boundary.
+ *
+ * @param {number} [eps=1e-9]
+ * Numerical tolerance for boundary checks.
+ *
+ * @returns {boolean}
+ * True iff the point is inside or on the boundary.
+ */
+const pointInClosedPolygonInclusive = (p, poly, eps = 1e-9) => {
+  if (!poly || poly.length < 4) return false;
+
+  for (let i = 0; i < poly.length - 1; i++) {
+    if (onSegment(poly[i], poly[i + 1], p, eps)) return true;
+  }
+
+  const px = p[0];
+  const py = p[1];
+  let inside = false;
+
+  for (let i = 0, j = poly.length - 2; i < poly.length - 1; j = i++) {
+    const xi = poly[i][0];
+    const yi = poly[i][1];
+    const xj = poly[j][0];
+    const yj = poly[j][1];
+
+    const intersects = yi > py !== yj > py;
+    if (!intersects) continue;
+
+    const xAtY = xj + ((py - yj) * (xi - xj)) / (yi - yj);
+    if (xAtY > px) inside = !inside;
+  }
+
+  return inside;
+};
+
+/**
+ * Computes the first intersection point between a line segment and a circle.
+ *
+ * The segment is parameterized as:
+ *   P(t) = A + t(B - A),  t in [0,1]
+ *
+ * The circle is centered at `center` with squared radius `r2`.
+ *
+ * Returns:
+ * - the first intersection encountered from `a` toward `b`
+ * - `null` if the segment does not intersect the circle
+ *
+ * Degenerate case:
+ * - If `a === b`, the segment is treated as a point.
+ * - In that case, returns `a` if the point lies in or on the circle.
+ *
+ * Notes:
+ * - Tangential contact counts as an intersection.
+ * - The returned point is the smaller valid root (`t1`) if present,
+ *   otherwise the larger valid root (`t2`).
+ *
+ * @param {Vec2} a
+ * Segment start point.
+ *
+ * @param {Vec2} b
+ * Segment end point.
+ *
+ * @param {Vec2} center
+ * Circle center.
+ *
+ * @param {number} r2
+ * Circle radius squared.
+ *
+ * @returns {Vec2|null}
+ * First segment-circle intersection point, or `null`.
+ */
+const segmentCircleFirstIntersection = (a, b, center, r2) => {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const fx = a[0] - center[0];
+  const fy = a[1] - center[1];
+
+  const qa = dx * dx + dy * dy;
+  const dist2 = fx * fx + fy * fy;
+
+  if (qa === 0) return dist2 <= r2 ? [a[0], a[1]] : null;
+
+  const qb = 2 * (fx * dx + fy * dy);
+  const qc = dist2 - r2;
+  const disc = qb * qb - 4 * qa * qc;
+
+  if (disc < 0) return null;
+
+  const sqrtDisc = Math.sqrt(disc);
+  const t1 = (-qb - sqrtDisc) / (2 * qa);
+  const t2 = (-qb + sqrtDisc) / (2 * qa);
+
+  if (t1 >= 0 && t1 <= 1) return [a[0] + t1 * dx, a[1] + t1 * dy];
+  if (t2 >= 0 && t2 <= 1) return [a[0] + t2 * dx, a[1] + t2 * dy];
+
+  return null;
+};
+
+/**
+ * Translates a point by a fixed distance along one of the two unit normals
+ * of a line segment, choosing the result based on polygon containment.
+ *
+ * Behavior:
+ * - Builds two candidate points, one along each segment normal.
+ * - Tests each candidate against `poly` using inclusive containment.
+ * - Chooses the candidate that is inside or outside depending on `wantInside`.
+ *
+ * Fallback behavior:
+ * - If both candidates are inside, or both are outside, returns the first
+ *   candidate deterministically.
+ *
+ * Degenerate cases:
+ * - If `line` is invalid or zero-length, returns `from` unchanged.
+ *
+ * @param {Vec2} from
+ * Point to translate.
+ *
+ * @param {[Vec2, Vec2] | null} line
+ * Reference segment whose normals define the translation directions.
+ *
+ * @param {number} distance
+ * Signed translation magnitude along the chosen unit normal.
+ *
+ * @param {ClosedPolygon} poly
+ * Polygon used to classify the candidate points.
+ *
+ * @param {boolean} [wantInside=true]
+ * If true, prefer the candidate inside the polygon.
+ * If false, prefer the candidate outside the polygon.
+ *
+ * @param {number} [eps=1e-9]
+ * Numerical tolerance used for polygon containment.
+ *
+ * @returns {Vec2}
+ * Selected translated point.
+ */
+const translateNormalIntoPoly = (
+  from,
+  line,
+  distance,
+  poly,
+  wantInside = true,
+  eps = 1e-9,
+) => {
+  if (!line || line.length !== 2) return [from[0], from[1]];
+
+  const a = line[0];
+  const b = line[1];
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy);
+
+  if (len === 0) return [from[0], from[1]];
+
+  const nx = -dy / len;
+  const ny = dx / len;
+
+  const p1 = [from[0] + nx * distance, from[1] + ny * distance];
+  const p2 = [from[0] - nx * distance, from[1] - ny * distance];
+
+  const in1 = pointInClosedPolygonInclusive(p1, poly, eps);
+  const in2 = pointInClosedPolygonInclusive(p2, poly, eps);
+
+  if (wantInside) {
+    if (in1 && !in2) return p1;
+    if (in2 && !in1) return p2;
+    return p1;
+  }
+
+  if (!in1 && in2) return p1;
+  if (!in2 && in1) return p2;
+  return p1;
+};
+
+/**
+ * Translates a point toward another point by a fixed distance.
+ *
+ * Behavior:
+ * - Computes the unit direction from `from` to `to`.
+ * - Returns `from + distance * dir`.
+ * - Does not clamp to the target, so overshoot is allowed.
+ *
+ * Degenerate case:
+ * - If `from === to`, returns `from`.
+ *
+ * @param {Vec2} from
+ * Start point.
+ *
+ * @param {Vec2} to
+ * Target point.
+ *
+ * @param {number} distance
+ * Distance to move along the direction toward `to`.
+ *
+ * @returns {Vec2}
+ * Translated point.
+ */
+const translateTowards = (from, to, distance) => {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const len = Math.hypot(dx, dy);
+
+  if (len === 0) return [from[0], from[1]];
+
+  const t = distance / len;
+  return [from[0] + dx * t, from[1] + dy * t];
+};
+
+/**
+ * Translates a point directly away from another point by a fixed distance.
+ *
+ * Behavior:
+ * - Computes the unit direction from `fromWhat` to `from`.
+ * - Returns `from + distance * dir`.
+ * - Does not clamp, so the result may move arbitrarily far away.
+ *
+ * Degenerate case:
+ * - If `from === fromWhat`, returns `from`.
+ *
+ * @param {Vec2} from
+ * Start point.
+ *
+ * @param {Vec2} fromWhat
+ * Point to move away from.
+ *
+ * @param {number} distance
+ * Distance to move away.
+ *
+ * @returns {Vec2}
+ * Translated point.
+ */
+const translateAway = (from, fromWhat, distance) => {
+  const dx = from[0] - fromWhat[0];
+  const dy = from[1] - fromWhat[1];
+  const len = Math.hypot(dx, dy);
+
+  if (len === 0) return [from[0], from[1]];
+
+  const t = distance / len;
+  return [from[0] + dx * t, from[1] + dy * t];
+};
+
+/**
+ * Computes the closest point on a closed line segment to a query point.
+ *
+ * Behavior:
+ * - Orthogonally projects `p` onto segment `ab`.
+ * - Clamps the projection parameter to [0,1].
+ * - Returns the nearest point on the segment.
+ *
+ * Degenerate case:
+ * - If `a === b`, returns `a`.
+ *
+ * @param {Vec2} p
+ * Query point.
+ *
+ * @param {Vec2} a
+ * Segment start point.
+ *
+ * @param {Vec2} b
+ * Segment end point.
+ *
+ * @returns {Vec2}
+ * Closest point on the segment.
+ */
+const closestPointOnSegment = (p, a, b) => {
+  const abx = b[0] - a[0];
+  const aby = b[1] - a[1];
+  const apx = p[0] - a[0];
+  const apy = p[1] - a[1];
+
+  const ab2 = abx * abx + aby * aby;
+  if (ab2 === 0) return [a[0], a[1]];
+
+  let t = (apx * abx + apy * aby) / ab2;
+  if (t < 0) t = 0;
+  else if (t > 1) t = 1;
+
+  return [a[0] + t * abx, a[1] + t * aby];
+};
+
+/**
+ * Computes the closest point on a closed polygon boundary to a query point.
+ *
+ * Behavior:
+ * - Iterates over each explicit polygon edge `poly[i] -> poly[i+1]`.
+ * - Finds the closest point on each edge.
+ * - Returns the closest boundary point, the supporting edge, and squared distance.
+ *
+ * Assumptions:
+ * - `poly` is explicitly closed.
+ * - The boundary is interpreted only through the explicit edges
+ *   `poly[i] -> poly[i+1]` for `i = 0..length-2`.
+ *
+ * @param {Vec2} p
+ * Query point.
+ *
+ * @param {ClosedPolygon} poly
+ * Closed polygon boundary.
+ *
+ * @returns {{ line:[Vec2,Vec2], point:Vec2, dist2:number }}
+ * Closest edge, closest point on that edge, and squared distance.
+ */
+const closestPointToPolygon = (p, poly) => {
+  let bestX = 0;
+  let bestY = 0;
+  let bestD2 = Infinity;
+  let bestA = [0, 0];
+  let bestB = [0, 0];
+
+  for (let i = 0; i < poly.length - 1; i++) {
+    const a = poly[i];
+    const b = poly[i + 1];
+    const q = closestPointOnSegment(p, a, b);
+
+    const dx = q[0] - p[0];
+    const dy = q[1] - p[1];
+    const d2 = dx * dx + dy * dy;
+
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      bestX = q[0];
+      bestY = q[1];
+      bestA = a;
+      bestB = b;
+      if (bestD2 === 0) break;
+    }
+  }
+
+  return {
+    line: [bestA, bestB],
+    point: [bestX, bestY],
+    dist2: bestD2,
+  };
+};
+
+/**
+ * Computes the closest point from a query point to a union of closed polygons.
+ *
+ * Behavior:
+ * - Evaluates `closestPointToPolygon` for each polygon in `polys`.
+ * - Returns the globally nearest result.
+ * - Also returns which polygon produced that nearest point.
+ *
+ * Degenerate behavior:
+ * - If `polys` is empty, the returned point/line/poly are `null`
+ *   and `dist2` remains `Infinity`.
+ *
+ * @param {Vec2} p
+ * Query point.
+ *
+ * @param {ClosedPolygon[]} polys
+ * Collection of closed polygons.
+ *
+ * @returns {{ poly:ClosedPolygon|null, line:[Vec2,Vec2]|null, point:Vec2|null, dist2:number }}
+ * Closest polygon, closest edge on that polygon, closest point, and squared distance.
+ */
+const closestPointToPolygonUnion = (p, polys) => {
+  let bestPoly = null;
+  let bestLine = null;
+  let bestPoint = null;
+  let bestD2 = Infinity;
+
+  for (let i = 0; i < polys.length; i++) {
+    const poly = polys[i];
+    const { line, point, dist2 } = closestPointToPolygon(p, poly);
+
+    if (dist2 < bestD2) {
+      bestD2 = dist2;
+      bestPoint = point;
+      bestLine = line;
+      bestPoly = poly;
+      if (bestD2 === 0) break;
+    }
+  }
+
+  return {
+    poly: bestPoly,
+    line: bestLine,
+    point: bestPoint,
+    dist2: bestD2,
+  };
+};
+
+/**
  * Geometry and spatial utility helpers used throughout the visibility
  * and pathfinding systems.
  *
@@ -994,92 +1758,6 @@ const walkGridCells = (a, b, cs, visitCell) => {
  *
  * @namespace util
  *
- * @property {number} TAU
- * Full circle constant (2π).
- *
- * @property {(x:number)=>number} wrapToPi
- * Wrap angle to the interval [-π, π).
- *
- * @property {(p1:Vec2,p2:Vec2,p3:Vec2)=>-1|0|1} deltaOrient
- * Signed orientation classification.
- *
- * @property {(ax:number,ay:number,bx:number,by:number)=>number} cross
- * 2D scalar cross product.
- *
- * @property {(ax:number,ay:number,bx:number,by:number)=>number} dot
- * 2D dot product.
- *
- * @property {(a:number,b:number)=>number} minAngleDist
- * Minimal angular distance between two angles.
- *
- * @property {(pos:Vec2,vPrev:Vec2,vertex:Vec2,vNext:Vec2)=>-1|0|1} checkCriticality
- * Classifies polygon vertex criticality relative to a viewpoint.
- *
- * @property {(a:number,b:number,eps:number)=>boolean} almostEq
- * Scalar approximate equality test.
- *
- * @property {(p:Vec2,q:Vec2,eps:number)=>boolean} ptEq
- * Approximate equality test for 2D points.
- *
- * @property {(a:Vec2,b:Vec2,c:Vec2)=>number} orient
- * Signed oriented area of triangle (a,b,c).
- *
- * @property {(a:Vec2,b:Vec2,p:Vec2,eps:number)=>boolean} onSegment
- * Tests whether point p lies on segment ab.
- *
- * @property {(idxs:number[],i:number,j:number)=>boolean} areRingAdjacent
- * Tests adjacency in cyclic index ordering.
- *
- * @property {(points:Vec2[],minX?:number,minY?:number,maxX?:number,maxY?:number)=>BBox} bboxOf
- * Computes bounding box of points.
- *
- * @property {(cx:number,cy:number)=>bigint} spatialCellKey
- * Packs integer cell coordinates into a BigInt key.
- *
- * @property {(a:Vec2,b:Vec2,c:Vec2,d:Vec2,eps:number)=>"proper"|"endpoint"|"overlap"|"none"} segSegIntersectKind
- * Classifies segment intersection type.
- *
- * @property {(p:Vec2,poly:Vec2[],eps:number)=>boolean} pointInPolygonStrict
- * Strict point-in-polygon test (boundary excluded).
- *
- * @property {(O:Vec2,d:Vec2,C:Vec2,D:Vec2,eps:number)=>number|null} raySegParamT
- * Ray–segment intersection returning ray parameter.
- *
- * @property {(O:Vec2,d:Vec2,bbox:BBox,eps?:number)=>{tEnter:number,tExit:number}|null} rayAABBEntryExit
- * Ray–AABB intersection interval.
- *
- * @property {(cone:VertexConeBasic|null,curr:Vec2,target:Vec2,eps:number)=>boolean} dirLooselyInsideInteriorCone
- * Loose interior cone membership test.
- *
- * @property {(cone:VertexConeBasic|null,curr:Vec2,target:Vec2,eps:number)=>boolean} dirStrictlyInsideInteriorCone
- * Strict interior cone membership test.
- *
- * @property {(c:Vec2,d:Vec2)=>BBox} edgeBBox
- * Bounding box of a segment.
- *
- * @property {(ring:Vec2[],eps:number)=>Vec2[]} normalizeRing
- * Removes consecutive duplicate vertices from a ring.
- *
- * @property {(a:Vec2,b:Vec2,c:Vec2,d:Vec2,eps?:number)=>boolean} segmentsProperlyIntersect
- * Strict segment intersection test used for occlusion.
- *
- * @property {(p:Vec2,a:Vec2,b:Vec2,eps:number)=>boolean} isEndpointOf
- * Tests if point equals segment endpoint.
- *
- * @property {(points:Vec2[])=>number} signedArea
- * Computes polygon signed area.
- *
- * @property {(ring:Vec2[],s:number)=>VertexCone[]} computeVertexCones
- * Computes interior cones for polygon vertices.
- *
- * @property {(origin:Vec2,dir:Vec2,tMax:number,cs:number)=>RayWalkState} beginRayWalk
- * Initializes grid ray traversal state.
- *
- * @property {(st:RayWalkState)=>boolean} advanceRayWalk
- * Advances ray traversal to next grid cell.
- *
- * @property {(a:Vec2,b:Vec2,cs:number,visitCell:(key:number|string)=>boolean|void)=>void} walkGridCells
- * Walks grid cells intersected by a segment.
  */
 export const util = {
   TAU,
@@ -1098,6 +1776,7 @@ export const util = {
   spatialCellKey,
   segSegIntersectKind,
   pointInPolygonStrict,
+  pointInClosedPolygonInclusive,
   raySegParamT,
   rayAABBEntryExit,
   dirLooselyInsideInteriorCone,
@@ -1111,4 +1790,21 @@ export const util = {
   beginRayWalk,
   advanceRayWalk,
   walkGridCells,
+  normalize,
+  outwardNormal,
+  transformPoints,
+  ccwAngleDelta,
+  clamp01,
+  smoothstep,
+  mix3,
+  buildBoundaryRect,
+  crossbarsAt,
+  squareAt,
+  segmentCircleFirstIntersection,
+  translateNormalIntoPoly,
+  translateTowards,
+  translateAway,
+  closestPointOnSegment,
+  closestPointToPolygon,
+  closestPointToPolygonUnion,
 };

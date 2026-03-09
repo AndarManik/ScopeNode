@@ -1,6 +1,7 @@
 import "./martinez.min.js";
 import { removeHoles, toMulti, unionNoHoles } from "./martinezutil.js";
 import { pushPathingObstacle } from "./pathing.js";
+import { util } from "./util.js";
 // Obstacles are the primary data for two graph based systems.
 // 1. Path planning
 // 2. Shine casting
@@ -80,10 +81,10 @@ export const setupObstacleBlockers = (game, transform) => {
   const hmp = mapHeight - playerRadius;
 
   const boundary = [
-    buildBoundaryRect(-1000, -1000, mapWidth + 1000, playerRadius - 1),
-    buildBoundaryRect(-1000, hmp + 1, mapWidth + 1000, mapHeight + 1000),
-    buildBoundaryRect(-1000, playerRadius, playerRadius, hmp),
-    buildBoundaryRect(wmp, playerRadius, mapWidth + 1000, hmp),
+    util.buildBoundaryRect(-1000, -1000, mapWidth + 1000, playerRadius - 1),
+    util.buildBoundaryRect(-1000, hmp + 1, mapWidth + 1000, mapHeight + 1000),
+    util.buildBoundaryRect(-1000, playerRadius, playerRadius, hmp),
+    util.buildBoundaryRect(wmp, playerRadius, mapWidth + 1000, hmp),
   ];
 
   game.obstacles = [];
@@ -106,71 +107,11 @@ export const setupObstacleBlockers = (game, transform) => {
   const crossPoint2 = transform(game, crossPoint1);
 
   game.obstacleBlockers = [
-    [[crossbarsAt(crossPoint1, game.team1Objective)]],
-    [[crossbarsAt(crossPoint2, game.team2Objective)]],
-    [[crossbarsAt(crossPoint1, game.team2Objective)]],
-    [[crossbarsAt(crossPoint2, game.team1Objective)]],
-    [[crossbarsAt(game.spawn1, crossPoint1)]],
-    [[crossbarsAt(game.spawn2, crossPoint2)]],
+    [[util.crossbarsAt(crossPoint1, game.team1Objective)]],
+    [[util.crossbarsAt(crossPoint2, game.team2Objective)]],
+    [[util.crossbarsAt(crossPoint1, game.team2Objective)]],
+    [[util.crossbarsAt(crossPoint2, game.team1Objective)]],
+    [[util.crossbarsAt(game.spawn1, crossPoint1)]],
+    [[util.crossbarsAt(game.spawn2, crossPoint2)]],
   ];
-};
-
-const buildBoundaryRect = (left, top, right, bottom) => [
-  [left, top],
-  [right, top],
-  [right, bottom],
-  [left, bottom],
-];
-
-const squareAt = ([cx, cy]) => [
-  [cx - 1, cy - 1],
-  [cx + 1, cy - 1],
-  [cx + 1, cy + 1],
-  [cx - 1, cy + 1],
-  [cx - 1, cy - 1],
-];
-
-const crossbarsAt = ([cx, cy], [dx, dy]) => {
-  let vx = dx - cx;
-  let vy = dy - cy;
-  const len = Math.hypot(vx, vy);
-
-  // Degenerate case: points coincide → just draw the 2x2 square
-  if (len === 0) return squareAt([cx, cy]);
-
-  // Unit direction from c → d
-  vx /= len;
-  vy /= len;
-
-  // Perpendicular unit vector
-  const nx = -vy;
-  const ny = vx;
-
-  // Rectangle parameters
-  const halfWidth = len / 2; // along the line between the points
-  const halfHeight = 1; // total height = 2
-
-  // Center at midpoint between the two points
-  const mx = (cx + dx) / 2;
-  const my = (cy + dy) / 2;
-
-  // Four corners (counter-clockwise) and close the polygon
-  const p1 = [
-    mx - vx * halfWidth - nx * halfHeight,
-    my - vy * halfWidth - ny * halfHeight,
-  ];
-  const p2 = [
-    mx + vx * halfWidth - nx * halfHeight,
-    my + vy * halfWidth - ny * halfHeight,
-  ];
-  const p3 = [
-    mx + vx * halfWidth + nx * halfHeight,
-    my + vy * halfWidth + ny * halfHeight,
-  ];
-  const p4 = [
-    mx - vx * halfWidth + nx * halfHeight,
-    my - vy * halfWidth + ny * halfHeight,
-  ];
-
-  return [p1, p2, p3, p4, p1];
 };

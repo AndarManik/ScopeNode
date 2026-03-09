@@ -288,8 +288,8 @@ export const createPlayerRenderer = (
     );
 
     // ---- Centers ----
-    const c1 = game.team1Objective;
-    const c2 = game.team2Objective;
+    const c1 = game.xSwap ? game.team2Objective : game.team1Objective;
+    const c2 = game.xSwap ? game.team1Objective : game.team2Objective;
 
     // ---- Colors (support legacy string call sites) ----
 

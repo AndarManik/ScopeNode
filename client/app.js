@@ -5,6 +5,7 @@ import { newMenu } from "./menu.js";
 import { main } from "./menu/main.js";
 import { newGame } from "./game.js";
 import { newStats } from "./stats.js";
+import { newConsole } from "./console.js";
 
 const app = {};
 addUserSettings(app);
@@ -13,6 +14,7 @@ app.color = newColor(app);
 app.socket = newSocket(app);
 app.menu = newMenu(app);
 app.game = newGame(app);
+app.console = newConsole(app);
 main(app);
 
 window.addEventListener("error", (e) =>

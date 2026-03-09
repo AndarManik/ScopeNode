@@ -5,24 +5,10 @@ import { filletPolyline } from "./pathsmoothing.js";
 import { createPlayerRenderer } from "./playerrendering.js";
 import { animateShot } from "./shootanimation.js";
 
-export const render = (game, team1, team2) => {
+export const render = (game) => {
   const { renderSettings, color, mapWidth, mapHeight, playerRadius } = game;
 
-  let isTeam1 = game.isTeam1;
-  let team1Lights = game.team1Lights;
-  let team2Lights = game.team2Lights;
-  ({ team1, isTeam1, team1Lights, team2Lights } = applyXSwap(
-    game,
-    team1,
-    team2,
-    isTeam1,
-  ));
-
   ensureSceneCanvases(game, renderSettings, mapWidth, mapHeight);
-
-  game.color.intersectPoint = isTeam1
-    ? game.color.intersectPoint1
-    : game.color.intersectPoint2;
 
   const ctx = game.sceneCtx;
 
@@ -34,12 +20,12 @@ export const render = (game, team1, team2) => {
     return;
   }
 
-  renderTeamLights(game, team1Lights, team2Lights, color, renderSettings);
-  renderMouseDot(ctx, game, isTeam1, color, playerRadius);
+  renderTeamLights(game, color, renderSettings);
+  renderMouseDot(ctx, game, color, playerRadius);
 
-  renderPlayerPath(ctx, game, isTeam1, color, playerRadius);
+  renderPlayerPath(ctx, game, color, playerRadius);
 
-  renderPlayers(game, isTeam1);
+  renderPlayers(game);
 
   renderObjectiveIfNeeded(
     game,
@@ -52,14 +38,17 @@ export const render = (game, team1, team2) => {
   renderShotsAndWarp(game, ctx, game.shots, playerRadius);
 };
 
-const renderPlayers = (game, ctx, team1) => {
-  const { color, playerRadius, renderSettings } = game;
+const renderPlayers = (game) => {
+  const { color, playerRadius, renderSettings, xSwap } = game;
 
   for (const player of game.players) {
     if (!player.isAlive) continue;
-    const isTeam1 = player.team1;
+
+    // Flip team identity when xSwap is enabled
+    const isTeam1 = xSwap ? !player.team1 : player.team1;
 
     const playerColor = isTeam1 ? color.team1Player : color.team2Player;
+
     const gunColorNormal = isTeam1 ? color.team1Gun : color.team2Gun;
     const gunColorSwapped = isTeam1 ? color.team2Gun : color.team1Gun;
     const gunColor = !player.advantage ? gunColorSwapped : gunColorNormal;
@@ -67,10 +56,11 @@ const renderPlayers = (game, ctx, team1) => {
     const glowColorNormal = isTeam1 ? color.team1Disk : color.team2Disk;
     const glowColorSwapped = isTeam1 ? color.team2Disk : color.team1Disk;
     const glowColor = !player.advantage ? glowColorSwapped : glowColorNormal;
+
     const glowParam = renderSettings.glowEnabled
       ? {
           glowRadius: playerRadius / 1.25,
-          glowColor: glowColor,
+          glowColor,
           composite: "screen",
         }
       : null;
@@ -86,7 +76,7 @@ const renderPlayers = (game, ctx, team1) => {
   }
 };
 
-const renderBotsDebug = (game, ctx, team1) => {
+const renderBotsDebug = (game, ctx) => {
   for (const state of game.players) {
     if (state.type !== "bot") continue;
     shifts.forEach(([x, y]) => {
@@ -102,21 +92,6 @@ const renderBotsDebug = (game, ctx, team1) => {
       ctx.fill();
     });
   }
-};
-
-const applyXSwap = (game, team1, team2, isTeam1) => {
-  let team1Lights = game.team1Lights;
-  let team2Lights = game.team2Lights;
-
-  if (game.xSwap) {
-    team1 = team2;
-    isTeam1 = !isTeam1;
-
-    team1Lights = game.team2Lights;
-    team2Lights = game.team1Lights;
-  }
-
-  return { team1, isTeam1, team1Lights, team2Lights };
 };
 
 const ensureSceneCanvases = (game, renderSettings, mapWidth, mapHeight) => {
@@ -145,26 +120,20 @@ const clearScene = (ctx, color, mapWidth, mapHeight) => {
   ctx.fill();
 };
 
-const renderTeamLights = (
-  game,
-  team1Lights,
-  team2Lights,
-  color,
-  renderSettings,
-) => {
+const renderTeamLights = (game, color, renderSettings) => {
   if (!game.lightGraph) return;
-
+  const { xSwap, team1Lights, team2Lights } = game;
   game.lightRenderer(
     game,
-    [...team1Lights.values()],
-    [...team2Lights.values()],
+    xSwap ? [...team2Lights.values()] : [...team1Lights.values()],
+    xSwap ? [...team1Lights.values()] : [...team2Lights.values()],
     color,
     renderSettings.glowEnabled,
   );
 };
 
-const renderMouseDot = (ctx, game, isTeam1, color, playerRadius) => {
-  ctx.fillStyle = isTeam1 ? color.team1Path : color.team2Path;
+const renderMouseDot = (ctx, game, color, playerRadius) => {
+  ctx.fillStyle = game.player.team1 ? color.team1Path : color.team2Path;
   ctx.beginPath();
   ctx.arc(game.mouse[0], game.mouse[1], playerRadius / 5, 0, Math.PI * 2);
   ctx.fill();
@@ -184,7 +153,7 @@ function strokeFilletedPath(ctx, points, R) {
   ctx.stroke();
 }
 
-const renderPlayerPath = (ctx, game, isTeam1, color, playerRadius) => {
+const renderPlayerPath = (ctx, game, color, playerRadius) => {
   const player = game.player;
   if (!player.isAlive || player.path.length <= 0) return;
 
@@ -195,7 +164,7 @@ const renderPlayerPath = (ctx, game, isTeam1, color, playerRadius) => {
   ctx.globalAlpha = alpha;
 
   const pathWidth = 5;
-  ctx.strokeStyle = isTeam1 ? color.team1Path : color.team2Path;
+  ctx.strokeStyle = player.team1 ? color.team1Path : color.team2Path;
   ctx.fillStyle = ctx.strokeStyle;
   ctx.lineWidth = (2 * playerRadius) / pathWidth;
   ctx.lineJoin = "round";
@@ -300,13 +269,7 @@ const renderShotsAndWarp = (game, ctx, shots, playerRadius) => {
   });
 };
 
-const renderObstaclePreviewScene = (
-  game,
-  ctx,
-  color,
-  renderSettings,
-  playerRadius,
-) => {
+const renderObstaclePreviewScene = (game, ctx, color, renderSettings) => {
   const { poly, previewPoly } = game.previewObstacle;
 
   // main preview obstacle

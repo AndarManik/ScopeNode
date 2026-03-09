@@ -1,4 +1,4 @@
-import { pointInClosedPolygonInclusive } from "./hitreg.js";
+import { util } from "./util.js";
 import { VisibilityGraph } from "./visibilitygraph.js";
 import { removeHoles, toMulti } from "./martinezutil.js";
 import { kickout, newKickoutParams } from "./pathkickout.js";
@@ -38,7 +38,9 @@ export const planPath = (game, source, target) => {
 
   let minDistance = Infinity;
 
-  if (!pointInClosedPolygonInclusive(source[0], source[1], targetPointPoly)) {
+  if (
+    !util.pointInClosedPolygonInclusive([source[0], source[1]], targetPointPoly)
+  ) {
     const sourceVerts = game.pathGraph.visibleIndicesAt(source);
     const vertices = game.pathGraph.vertices;
 
@@ -97,7 +99,9 @@ export const planPathSafe = (game, source, target, avoidASPS) => {
   const targetVerts = game.pathGraph.visibleIndicesAt(target);
   const targetPointPoly = game.pathGraph.pointPolyAt(target, targetVerts);
 
-  if (pointInClosedPolygonInclusive(source[0], source[1], targetPointPoly))
+  if (
+    util.pointInClosedPolygonInclusive([source[0], source[1]], targetPointPoly)
+  )
     return fallBack;
 
   const sourceVerts = game.pathGraph.visibleIndicesAt(source);
@@ -741,9 +745,3 @@ class MinHeap {
     return top;
   }
 }
-
-const expansionPather = (game) => {
-  const { vertices, edges } = game.pathGraph.edges;
-  const polygons = game.pathTotal.map(([poly]) => poly);
-
-};

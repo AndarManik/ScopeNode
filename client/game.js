@@ -22,14 +22,11 @@ export const newGame = (app, options, team1, team2) => {
   game.isMultiPlayer = team1 && team2;
 
   game.userId = game.isMultiPlayer ? app.menu.userId : "player";
-  game.isTeam1 = !game.isMultiPlayer || team1.has(game.userId);
-  game.isSpec = !game.isTeam1 && !team2.has(game.userId);
 
   game.team1 = game.isMultiPlayer ? team1 : new Set(["player"]);
-  game.team2 = game.isMultiPlayer ? team2 : new Set(["o2"]);
+  game.team2 = game.isMultiPlayer ? team2 : new Set(["o1"]);
 
-  team1 = game.team1;
-  team2 = game.team2;
+  game.isSpec = !game.team1.has(game.userId) && !game.team2.has(game.userId);
 
   game.all = [...game.team1, ...game.team2].sort();
   game.allInv = Object.fromEntries(game.all.map((uuid, i) => [uuid, i]));
@@ -57,12 +54,12 @@ export const newGame = (app, options, team1, team2) => {
     game.playersMap = new Map(game.players.map((p) => [p.uuid, p]));
 
     if (game.isSpec) game.player.isAlive = false;
+    //game.player.isAlive = false;
     game.team1Lights = new Map();
     game.team2Lights = new Map();
 
     game.startTime = performance.now();
     game.shots = new Set();
-    game.shotsFinished = false;
 
     if (game.isMultiPlayer) return;
 
@@ -72,7 +69,7 @@ export const newGame = (app, options, team1, team2) => {
 
   game.init();
 
-  startEngine(game, app, team1, team2);
+  startEngine(game, app);
 
   if (game.isMultiPlayer) {
     game.handleBuildObstacles = () => {
@@ -125,7 +122,7 @@ export const newGame = (app, options, team1, team2) => {
         for (const shot of game.shots) if (!shot.isHit) return;
         clearInterval(checker);
 
-        const teamString = game.isTeam1 ? "team1" : "team2";
+        const teamString = game.player.team1 ? "team1" : "team2";
         hugeText.classList.remove("fading-out");
         hugeText.style.opacity = 0.9;
         hugeText.style.fontSize = "128px";
@@ -187,7 +184,7 @@ export const newGame = (app, options, team1, team2) => {
 
     game.handleEnd = (winner, score) => {
       const showRoundResultText = () => {
-        const teamString = game.isTeam1 ? "team1" : "team2";
+        const teamString = game.player.team1 ? "team1" : "team2";
         hugeText.classList.remove("fading-out");
         hugeText.style.opacity = 0.9;
         hugeText.style.fontSize = "128px";
@@ -259,7 +256,6 @@ export const newPlayer = (game, uuid) => {
   return {
     uuid,
     isAlive: true,
-    seen: 0,
 
     team1: game.team1.has(uuid),
     team2: game.team2.has(uuid),
@@ -277,6 +273,8 @@ export const newPlayer = (game, uuid) => {
     smoothedTargetAngle: 0,
     smoothedTargetAngularVel: 0,
 
+    // for multiplayer
+    seen: 0,
     tick: [0, 0],
     vector: game.all
       .filter((otherUUID) => otherUUID !== uuid)
