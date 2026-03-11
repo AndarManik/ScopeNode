@@ -424,20 +424,18 @@ export class VisibilityGraph {
     if (util.dirLooselyInsideInteriorCone(cone, origin, directionAt, this._EPS))
       return origin;
 
-    const vis = this.getVertexVisibility(index);
+    const vertexVisibility = this.getVertexVisibility(index);
 
     angle = util.wrapToPi(angle);
-    let low = 0;
-    let high = vis.length;
-    while (low < high) {
-      const mid = (low + high) >> 1;
-      if (vis[mid].curr.angle <= angle) low = mid + 1;
-      else high = mid;
+    let angularIndex = 0;
+    while (angularIndex < vertexVisibility.length) {
+      if (angle <= vertexVisibility[angularIndex].curr.angle) break;
+      angularIndex++;
     }
-    let angularIndex = low - 1;
-    if (angularIndex < 0) angularIndex = vis.length - 1;
+    angularIndex += vertexVisibility.length - 1;
+    angularIndex %= vertexVisibility.length;
 
-    const endCap = vis[angularIndex].endCap;
+    const endCap = vertexVisibility[angularIndex].endCap;
     if (endCap.doesNotHit)
       return [origin[0] + dir[0] * maxDist, origin[1] + dir[1] * maxDist];
 

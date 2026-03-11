@@ -1,11 +1,4 @@
-import {
-  confirmPreviewObstacle,
-  forceDropNewObstacle,
-  initializeObstacles,
-  initializeReceivedObstacles,
-  receivePreviewObstacle,
-} from "./game/arena.js";
-import { newVirtualServer } from "./game/virtualserver.js";
+import { initializeObstacles } from "./game/arena.js";
 import { values } from "./values.js";
 import { newKeyBoard, newMouse } from "./game/input.js";
 import { startEngine } from "./game/engineloop.js";
@@ -40,7 +33,7 @@ export const newGame = (app, options, team1, team2) => {
   game.mouse = newMouse(game, app.menu);
   game.keyboard = newKeyBoard(game, app.menu);
 
-  game.init = () => {
+  const init = () => {
     game.players = game.all.map((uuid) => {
       const player = newPlayer(game, uuid);
       player.type = game.isMultiPlayer ? "online" : "bot";
@@ -54,176 +47,27 @@ export const newGame = (app, options, team1, team2) => {
     game.playersMap = new Map(game.players.map((p) => [p.uuid, p]));
 
     if (game.isSpec) game.player.isAlive = false;
-    //game.player.isAlive = false;
     game.team1Lights = new Map();
     game.team2Lights = new Map();
 
     game.startTime = performance.now();
     game.shots = new Set();
+  };
 
-    if (game.isMultiPlayer) return;
-
+  game.init = () => {
+    if (game.isMultiPlayer) return init();
     game.buildingObstacles = true;
-    initializeObstacles(game, () => (game.buildingObstacles = false));
+    initializeObstacles(game, () => {
+      setTimeout(init());
+      game.buildingObstacles = false;
+    });
   };
 
   game.init();
 
   startEngine(game, app);
 
-  if (game.isMultiPlayer) {
-    game.handleBuildObstacles = () => {
-      initializeObstacles(game, () =>
-        app.socket.json({
-          command: "obstacles",
-          obstacles: {
-            obstacles: game.obstacles,
-            blockers: game.obstacleBlockers,
-            team1Objective: game.team1Objective,
-            team2Objective: game.team2Objective,
-          },
-        }),
-      );
-    };
-
-    game.handleObstacles = (obstacles) => {
-      initializeReceivedObstacles(game, obstacles);
-      app.socket.json({ command: "has obstacles" });
-    };
-
-    game.startVirtualServer = () => {
-      game.preRound = true;
-      game.init();
-      game.virtualServer = newVirtualServer(game, app);
-      game.virtualServer.start();
-      app.socket.json({ command: "virtual server started" });
-    };
-
-    const hugeText = document.getElementById("Huge");
-    game.handleStart = () => {
-      ["3", "2", "1", "GO"].forEach((text, i) => {
-        setTimeout(() => {
-          hugeText.classList.remove("fading-out");
-          hugeText.style.opacity = 0.9;
-          hugeText.style.fontSize = "512px";
-          hugeText.innerText = text;
-          setTimeout(() => {
-            hugeText.classList.add("fading-out");
-            hugeText.style.opacity = 0;
-          }, 250);
-          if (text !== "GO") return;
-          game.preRound = false;
-        }, i * 1000);
-      });
-    };
-
-    game.handleEndRound = (winner, score) => {
-      const showRoundResultText = () => {
-        for (const shot of game.shots) if (!shot.isHit) return;
-        clearInterval(checker);
-
-        const teamString = game.player.team1 ? "team1" : "team2";
-        hugeText.classList.remove("fading-out");
-        hugeText.style.opacity = 0.9;
-        hugeText.style.fontSize = "128px";
-        const resultText =
-          winner === "draw"
-            ? "ROUND DRAW"
-            : winner === teamString
-              ? "ROUND WON"
-              : "ROUND LOST";
-        hugeText.innerText = `${score.join(" - ")}\n${resultText}`;
-
-        setTimeout(fadeOutRoundText, 3000);
-        setTimeout(() => app.socket.json({ command: "round end" }), 4000);
-      };
-      const fadeOutRoundText = () => {
-        hugeText.classList.add("fading-out");
-        hugeText.style.opacity = 0;
-      };
-      const checker = setInterval(showRoundResultText, 50);
-    };
-
-    game.stopVirtualServer = () => {
-      game.preRound = true;
-      game.virtualServer.isStopped = true;
-      app.socket.json({ command: "virtual server stopped" });
-    };
-
-    game.startChoosingObstacle = () => {
-      game.choosingObstacle = true;
-      const total = 20000;
-      const countdowns = [10, 5, 3, 2, 1];
-      game.forceDrop = countdowns.map((secLeft) =>
-        setTimeout(
-          () => {
-            // Show the number
-            hugeText.classList.remove("fading-out");
-            hugeText.style.opacity = 0.9;
-            hugeText.style.fontSize = "512px";
-            hugeText.innerText = secLeft;
-            setTimeout(() => {
-              hugeText.classList.add("fading-out");
-              hugeText.style.opacity = 0;
-            }, 250);
-          },
-          total - secLeft * 1000,
-        ),
-      );
-
-      game.forceDrop.push(
-        setTimeout(() => forceDropNewObstacle(game, app.socket), total),
-      );
-    };
-
-    game.confirmPreviewObstacle = (obstacle) => {
-      game.previewingObstacle = false;
-      confirmPreviewObstacle(game, obstacle);
-      app.socket.json({ command: "has confirmed obstacle" });
-    };
-
-    game.handleEnd = (winner, score) => {
-      const showRoundResultText = () => {
-        const teamString = game.player.team1 ? "team1" : "team2";
-        hugeText.classList.remove("fading-out");
-        hugeText.style.opacity = 0.9;
-        hugeText.style.fontSize = "128px";
-        const resultText =
-          winner === "draw"
-            ? "MATCH DRAW"
-            : winner === teamString
-              ? "MATCH WON"
-              : "MATCH LOST";
-        hugeText.innerText = `${score.join(" - ")}\n${resultText}`;
-      };
-      const fadeOutRoundText = () => {
-        hugeText.classList.add("fading-out");
-        hugeText.style.opacity = 0;
-      };
-      setTimeout(showRoundResultText, 500);
-      setTimeout(fadeOutRoundText, 3500);
-      setTimeout(() => !app.menu.open && app.menu.toggle(), 4500);
-    };
-
-    game.handleMessage = ({ data }) => {
-      if (game.virtualServer.isStopped) {
-        if (receivePreviewObstacle(game, data)) game.previewingObstacle = true;
-      } else game.virtualServer.addState(data);
-    };
-
-    game.updatePlayers = (newTeam1, newTeam2) => {
-      newTeam1 = new Set(newTeam1.map(({ userId }) => userId));
-      newTeam2 = new Set(newTeam2.map(({ userId }) => userId));
-      team1 = newTeam1;
-      team2 = newTeam2;
-      game.virtualServer.updatePlayers(newTeam1, newTeam2);
-    };
-
-    app.socket.json({ command: "client ready" });
-  } else {
-    game.handleMessage = () => {};
-    game.updatePlayers = () => {};
-  }
+  if (game.isMultiPlayer) app.socket.json({ command: "client ready" });
 
   return game;
 };
@@ -243,6 +87,7 @@ const parseGameOptions = (game, options) => {
       game.obstacleArea = 7;
       game.obstacleStartCount = 16;
       break;
+
     case "large":
       game.playerRadius = 8;
       game.moveSpeed = 13;

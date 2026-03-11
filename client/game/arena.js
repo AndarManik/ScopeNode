@@ -22,12 +22,25 @@ export const initializeObstacles = (game, whenDone) => {
   let count = 0;
   const obstacleArea = game.obstacleArea;
 
+  let startTime = performance.now();
+
+  const fin = () => {
+    game.obstacleArea = obstacleArea;
+    pushManyPathingObstacle(game, game.obstacles);
+    pushManyLightingObstacles(game, game.obstacles);
+    if (whenDone) whenDone();
+  };
+
   const pushTwo = () => {
-    const prealpha = count / game.obstacleStartCount;
-    const alpha = 1 - prealpha;
-    game.obstacleArea = alpha * obstacleArea + (1 - alpha) * 4;
+    const alpha = 1 - count / game.obstacleStartCount;
+    game.obstacleArea = alpha * obstacleArea + (1 - alpha) * 2;
 
     while (true) {
+      const tooLong = performance.now() - startTime > 1500;
+      if (tooLong)
+        if (count) return fin();
+        else return;
+
       let pos = sampleUniform(game);
       if (count === 0) pos[1] = game.mapHeight / 2;
       const obstacle1 = generateObstacle(game, pos);
@@ -56,10 +69,7 @@ export const initializeObstacles = (game, whenDone) => {
       if (whenDone) return pushTwo();
       else return setTimeout(pushTwo, 1000 / 20);
 
-    game.obstacleArea = obstacleArea;
-    pushManyPathingObstacle(game, game.obstacles);
-    pushManyLightingObstacles(game, game.obstacles);
-    if (whenDone) whenDone();
+    fin();
   };
 
   pushTwo();
@@ -88,7 +98,7 @@ export const newObstaclePreview = (game, socket) => {
   validateNewObstacle(game, game.previewObstacle);
 
   if (game.mouse.isClicking && game.previewObstacle.index !== -1) {
-    game.forceDrop.forEach((timeout) => clearTimeout(timeout));
+    game.forceDrop?.forEach((timeout) => clearTimeout(timeout));
     game.choosingObstacle = false;
     addObstacle(game, game.previewObstacle);
     return socket.json({

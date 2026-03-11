@@ -1,4 +1,5 @@
 import { newGame } from "./game.js";
+import { gameUtil } from "./game/gameutil.js";
 import { lobby, updateLobbyNames, updateLobbySize } from "./menu/lobby.js";
 import { jiggleApp } from "./screentransform.js";
 
@@ -96,11 +97,13 @@ export const newSocket = (app) => {
 };
 
 const handleMessage = (app, message) => {
-  if (typeof message.data !== "string") return app.game.handleMessage(message);
+  if (typeof message.data !== "string")
+    return gameUtil.handleMessage(app.game, message.data);
 
   const { menu } = app;
   const data = JSON.parse(message.data);
   console.log(data.command);
+
   switch (data.command) {
     case "lobby user id": {
       menu.userId = data.userId;
@@ -110,7 +113,6 @@ const handleMessage = (app, message) => {
 
     case "join lobby": {
       menu.lobbyCode = data.lobbyCode;
-      //always send to lobby
       return lobby(app);
     }
 
@@ -119,7 +121,7 @@ const handleMessage = (app, message) => {
       menu.team2 = data.team2;
       menu.spec = data.spec;
       updateLobbyNames(menu);
-      app.game.updatePlayers(data.team1, data.team2);
+      gameUtil.updatePlayers(app.game, data.team1, data.team2);
       return;
     }
 
@@ -133,53 +135,54 @@ const handleMessage = (app, message) => {
       const team1 = new Set(data.team1);
       const team2 = new Set(data.team2);
       app.game = newGame(app, data.mapSize, team1, team2);
+      app.socket.json({ command: "client ready" });
       jiggleApp();
       return;
     }
 
     case "build obstacles": {
-      app.game.handleBuildObstacles();
+      gameUtil.handleBuildObstacles(app.game, app);
       return;
     }
 
     case "obstacles": {
-      app.game.handleObstacles(data.obstacles);
+      gameUtil.handleObstacles(app.game, app, data.obstacles);
       return;
     }
 
     case "start virtual server": {
-      app.game.startVirtualServer();
+      gameUtil.startVirtualServer(app.game, app);
       if (menu.open) menu.toggle();
       return;
     }
 
     case "start round": {
-      app.game.handleStart();
+      gameUtil.handleStart(app.game);
       return;
     }
 
     case "end round": {
-      app.game.handleEndRound(data.winner, data.score);
+      gameUtil.handleEndRound(app.game, app, data.winner, data.score);
       return;
     }
 
     case "start choosing obstacle": {
-      app.game.startChoosingObstacle();
+      gameUtil.startChoosingObstacle(app.game, app);
       return;
     }
 
     case "confirm obstacle": {
-      app.game.confirmPreviewObstacle(data);
+      gameUtil.confirmPreviewObstacle(app.game, app, data);
       return;
     }
 
     case "stop virtual server": {
-      app.game.stopVirtualServer();
+      gameUtil.stopVirtualServer(app.game, app);
       return;
     }
 
     case "end game": {
-      app.game.handleEnd(data.winner, data.score);
+      gameUtil.handleEnd(app.game, app, data.winner, data.score);
       return;
     }
   }

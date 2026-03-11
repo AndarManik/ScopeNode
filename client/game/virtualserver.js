@@ -13,26 +13,20 @@ export const newVirtualServer = (game, app) => {
 
   // idempotent
   virtualServer.addState = (packedState) => {
-    const { uuid, state } = unpackState(all, packedState);
     if (!player.isAlive) return;
+    const { uuid, state } = unpackState(all, packedState);
     const tick = state.tick[1];
     if (tick < processedTick) return;
     const userHistory = globalHistories.get(uuid);
+    const lastHistory = userHistory[userHistory.length - 1];
+    const lastTick = lastHistory ? lastHistory.tick[1] : -Infinity;
+    if (tick < lastTick) spliceOnlinePlayerState(uuid, state);
+    if (tick > lastTick) updateOnlinePlayerState(uuid, state);
+  };
+
+  const spliceOnlinePlayerState = (uuid, state) => {
+    const userHistory = globalHistories.get(uuid);
     const n = userHistory.length;
-    if (n === 0) {
-      Object.assign(playersMap.get(uuid), structuredClone(state));
-      playersMap.get(uuid).seen = 0;
-      userHistory.push(state);
-      return;
-    }
-    const lastTick = userHistory[n - 1].tick[1];
-    if (lastTick < tick) {
-      Object.assign(playersMap.get(uuid), structuredClone(state));
-      playersMap.get(uuid).seen = 0;
-      userHistory.push(state);
-      return;
-    }
-    if (lastTick === tick) return;
     let low = 0;
     let high = n;
     while (low < high) {
@@ -43,6 +37,14 @@ export const newVirtualServer = (game, app) => {
     }
     if (low < n && userHistory[low].tick[1] === tick) return;
     userHistory.splice(low, 0, state);
+  };
+
+  const updateOnlinePlayerState = (uuid, state) => {
+    globalHistories.get(uuid).push(state);
+    const player = playersMap.get(uuid);
+    Object.assign(player, state);
+    player.position = [...player.position];
+    player.seen = 0;
   };
 
   const alpha = 0.05;
