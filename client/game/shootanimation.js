@@ -10,22 +10,22 @@ export const animateShot = (game, ctx, shot, s) => {
     // Base colors
     const playerColor = team1 ? color.team2Player : color.team1Player;
     const gunColor = team1 ? color.team2Gun : color.team1Gun;
-    const glowColor = team1 ? color.team2Disk : color.team1Disk;
 
     game.drawPlayer(
       killedPosition,
       playerRadius,
-      playerColor,
+      game.playerRadius,
       gunColor,
+      playerColor,
       Math.atan2(
         killerPosition[1] - killedPosition[1],
-        killerPosition[0] - killedPosition[0]
+        killerPosition[0] - killedPosition[0],
       ),
       {
         glowRadius: playerRadius / 1.25,
-        glowColor: glowColor,
+        glowColor: gunColor,
         composite: "screen",
-      }
+      },
     );
   }
 
@@ -35,7 +35,7 @@ export const animateShot = (game, ctx, shot, s) => {
 
   const bulletLength = 4 * playerRadius;
 
-  if (anim === 0) jabApp([dx, -dy], 1000);
+  if (anim === 0) jabApp([dx, -dy], 1500);
 
   if (dist < anim * bulletSpeed * playerRadius - bulletLength)
     shot.isHit = true;
@@ -43,9 +43,8 @@ export const animateShot = (game, ctx, shot, s) => {
   if (1280 < anim * bulletSpeed * playerRadius - bulletLength)
     shot.finished = true;
 
-  // Trail tuning: 10–20 playerRadius
   const minTrailLen = 2 * playerRadius;
-  const maxTrailLen = 16 * playerRadius;
+  const maxTrailLen = 32 * playerRadius;
   const headLen = anim * bulletSpeed * playerRadius;
   if (dist === 0) return hit;
 

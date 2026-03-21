@@ -49,11 +49,13 @@ export const gameUtil = {
   },
 
   handleObstacles(game, app, obstacles) {
+    if (!game.isMultiPlayer) return;
     initializeReceivedObstacles(game, obstacles);
     app.socket.json({ command: "has obstacles" });
   },
 
   startVirtualServer(game, app) {
+    if (!game.isMultiPlayer) return;
     game.preRound = true;
     game.init();
     game.virtualServer = newVirtualServer(game, app);
@@ -62,6 +64,7 @@ export const gameUtil = {
   },
 
   handleStart(game) {
+    if (!game.isMultiPlayer) return;
     ["3", "2", "1", "GO"].forEach((text, i) => {
       setTimeout(() => {
         showHugeText(text, "512px", 250);
@@ -71,6 +74,7 @@ export const gameUtil = {
   },
 
   handleEndRound(game, app, winner, score) {
+    if (!game.isMultiPlayer) return;
     const showRoundResultText = () => {
       for (const shot of game.shots) {
         if (!shot.isHit) return;
@@ -96,6 +100,7 @@ export const gameUtil = {
   },
 
   startChoosingObstacle(game, app) {
+    if (!game.isMultiPlayer) return;
     game.choosingObstacle = true;
 
     const total = 20000;
@@ -116,18 +121,21 @@ export const gameUtil = {
   },
 
   confirmPreviewObstacle(game, app, obstacle) {
+    if (!game.isMultiPlayer) return;
     game.previewingObstacle = false;
     confirmPreviewObstacle(game, obstacle);
     app.socket.json({ command: "has confirmed obstacle" });
   },
 
   stopVirtualServer(game, app) {
+    if (!game.isMultiPlayer) return;
     game.preRound = true;
     if (game.virtualServer) game.virtualServer.isStopped = true;
     app.socket.json({ command: "virtual server stopped" });
   },
 
   handleEnd(game, app, winner, score) {
+    if (!game.isMultiPlayer) return;
     const teamString = game.player.team1 ? "team1" : "team2";
     const resultText =
       winner === "draw"
@@ -145,6 +153,7 @@ export const gameUtil = {
   },
 
   handleMessage(game, data) {
+    if (!game.isMultiPlayer) return;
     if (!game.virtualServer) return;
 
     if (game.virtualServer.isStopped) {
@@ -156,6 +165,7 @@ export const gameUtil = {
   },
 
   updatePlayers(game, newTeam1, newTeam2) {
+    if (!game.isMultiPlayer) return;
     const team1 = new Set(newTeam1.map(({ userId }) => userId));
     const team2 = new Set(newTeam2.map(({ userId }) => userId));
 

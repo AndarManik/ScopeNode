@@ -13,14 +13,13 @@ export const newVirtualServer = (game, app) => {
 
   // idempotent
   virtualServer.addState = (packedState) => {
-    if (!player.isAlive) return;
     const { uuid, state } = unpackState(all, packedState);
     const tick = state.tick[1];
     if (tick < processedTick) return;
     const userHistory = globalHistories.get(uuid);
     const lastHistory = userHistory[userHistory.length - 1];
     const lastTick = lastHistory ? lastHistory.tick[1] : -Infinity;
-    if (tick < lastTick) spliceOnlinePlayerState(uuid, state);
+    if (!game.isSpec && tick < lastTick) spliceOnlinePlayerState(uuid, state);
     if (tick > lastTick) updateOnlinePlayerState(uuid, state);
   };
 
@@ -40,7 +39,7 @@ export const newVirtualServer = (game, app) => {
   };
 
   const updateOnlinePlayerState = (uuid, state) => {
-    globalHistories.get(uuid).push(state);
+    if (!game.isSpec) globalHistories.get(uuid).push(state);
     const player = playersMap.get(uuid);
     Object.assign(player, state);
     player.position = [...player.position];
@@ -61,7 +60,9 @@ export const newVirtualServer = (game, app) => {
     if (virtualServer.isStopped) return;
 
     const headroomTick = getHeadroomTick();
-    if (headroomTick) {
+    const time = performance.now() - game.startTime;
+
+    if (!game.isSpec && headroomTick) {
       const startTick = tick + 1;
       const lamportTick = getLamportTick(startTick);
       const speculativeTick = getSpeculativeTick(startTick);
@@ -75,8 +76,6 @@ export const newVirtualServer = (game, app) => {
       const vector = [];
       for (const { type, tick, uuid } of players)
         if (type === "online") vector.push([uuid, tick[0]]);
-
-      const time = performance.now() - game.startTime;
 
       const localState = {
         tick: [startTick, tick],
@@ -96,11 +95,9 @@ export const newVirtualServer = (game, app) => {
 
     while (processHistory());
 
+    //oldest unprocessed state
     const localHistory = globalHistories.get(userId);
-
-    const lag =
-      (localHistory[localHistory.length - 1]?.time ?? 0) -
-      (localHistory[0]?.time ?? 0);
+    const lag = localHistory.length ? time - localHistory[0].time : 0;
     expAvg = invalpha * expAvg + alpha * lag;
 
     const log = stats.log;

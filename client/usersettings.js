@@ -24,8 +24,8 @@ export const addUserSettings = (app) => {
   rawSettings.render = {
     scale: defaultGet("render.scale", 1),
     preferredSide: defaultGet("render.preferredSide", "left"),
-    bulletSpeed: defaultGet("render.bulletSpeed", 100),
-    shellAngle: defaultGet("render.shellAngle", 150),
+    bulletSpeed: defaultGet("render.bulletSpeed", 200),
+    shellAngle: defaultGet("render.shellAngle", 130),
     glowEnabled: defaultGet("render.glowEnabled", false),
     fpsCap: defaultGet("render.fpsCap", 70),
     vSync: defaultGet("render.vSync", true),

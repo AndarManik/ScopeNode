@@ -20,34 +20,32 @@ export const newColor = (app) => {
 
   color.setGameByHue = () => {
     const hue = color.hue;
-    color.background = `oklch(0.25 0.005 ${hue})`;
-    color.backgroundBrilliant = `oklch(0.15 0.015 ${hue})`;
+    color.team1Path = `oklch(0.92 0.040 ${hue - 72})`;
+    color.team2Path = `oklch(0.92 0.040 ${hue + 72})`;
+    color.team1Bullet = `oklch(0.92 0.040 ${hue - 72})`;
+    color.team2Bullet = `oklch(0.92 0.040 ${hue + 72})`;
+    color.team1Objective = `oklch(0.92 0.040 ${hue - 45})`;
+    color.team2Objective = `oklch(0.92 0.040 ${hue + 45})`;
+    color.centerObjective = `oklch(0.92 0.040 ${hue})`;
 
-    color.team1Player = `oklch(0.85 0.075 ${hue - 72})`;
-    color.team2Player = `oklch(0.85 0.075 ${hue + 72})`;
+    color.team1Player = `oklch(0.833 0.082 ${hue - 72})`;
+    color.team2Player = `oklch(0.833 0.082 ${hue + 72})`;
+    color.intersectDisk = `oklch(0.833 0.082 ${hue})`;
 
-    color.team1Objective = `oklch(0.90 0.045 ${hue - 45})`;
-    color.team2Objective = `oklch(0.90 0.045 ${hue + 45})`;
-    color.centerObjective = `oklch(0.90 0.045 ${hue})`;
-
-    color.team1Path = `oklch(0.90 0.045 ${hue - 72})`;
-    color.team2Path = `oklch(0.90 0.045 ${hue + 72})`;
-
-    color.team1Point = `oklch(0.35 0.025 ${hue - 45})`;
-    color.team2Point = `oklch(0.35 0.025 ${hue + 45})`;
-
-    color.intersectPoint = `oklch(0.15 0.015 ${hue})`;
-
+    color.objectiveDisk = `oklch(0.75 0.125 ${hue})`;
     color.team1Disk = `oklch(0.75 0.125 ${hue - 72})`;
     color.team2Disk = `oklch(0.75 0.125 ${hue + 72})`;
-    color.objectiveDisk = `oklch(0.75 0.125 ${hue})`;
-    color.intersectDisk = `oklch(0.86 0.065 ${hue})`;
-
-    color.team1Bullet = `oklch(0.90 0.045 ${hue - 72})`;
-    color.team2Bullet = `oklch(0.90 0.045 ${hue + 72})`;
 
     color.team1Gun = `oklch(0.60 0.100 ${hue - 45})`;
     color.team2Gun = `oklch(0.60 0.100 ${hue + 45})`;
+
+    color.team1Point = `oklch(0.45 0.025 ${hue - 45})`;
+    color.team2Point = `oklch(0.45 0.025 ${hue + 45})`;
+
+    color.background = `oklch(0.30 0.025 ${hue})`;
+
+    color.backgroundBrilliant = `oklch(0.15 0.025 ${hue})`;
+    color.intersectPoint = `oklch(0.15 0.025 ${hue})`;
 
     color.team1Name = namehue(hue - 60);
     color.team2Name = namehue(hue + 60);

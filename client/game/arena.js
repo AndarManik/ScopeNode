@@ -39,7 +39,7 @@ export const initializeObstacles = (game, whenDone) => {
       const tooLong = performance.now() - startTime > 1500;
       if (tooLong)
         if (count) return fin();
-        else return;
+        else return console.log("too long to build");
 
       let pos = sampleUniform(game);
       if (count === 0) pos[1] = game.mapHeight / 2;
@@ -101,12 +101,14 @@ export const newObstaclePreview = (game, socket) => {
     game.forceDrop?.forEach((timeout) => clearTimeout(timeout));
     game.choosingObstacle = false;
     addObstacle(game, game.previewObstacle);
-    return socket.json({
-      command: "confirm obstacle",
-      position: game.mouse,
-      angle: game.previewAngle,
-      alpha: game.previewAlpha,
-    });
+    if (game.isMultiPlayer)
+      return socket.json({
+        command: "confirm obstacle",
+        position: game.mouse,
+        angle: game.previewAngle,
+        alpha: game.previewAlpha,
+      });
+    else return game.build();
   }
 
   socket.send(

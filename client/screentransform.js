@@ -59,9 +59,9 @@ export function jiggleApp(
 // Directional jab (unchanged)
 export function jabApp(
   direction,
-  duration = 1000,
-  magnitude = 20,
-  tiltMagnitude = 3,
+  duration = 1500,
+  magnitude = 150,
+  tiltMagnitude = 7,
 ) {
   const start = performance.now();
 

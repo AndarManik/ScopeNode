@@ -7,17 +7,15 @@ export const newGame = (app, options, team1, team2) => {
   if (app.game) app.game.isDead = true;
 
   const game = { ...values, ...app.settings.game };
-
   parseGameOptions(game, options);
   game.renderSettings = app.settings.render;
   game.color = app.color;
 
   game.isMultiPlayer = team1 && team2;
-
   game.userId = game.isMultiPlayer ? app.menu.userId : "player";
 
   game.team1 = game.isMultiPlayer ? team1 : new Set(["player"]);
-  game.team2 = game.isMultiPlayer ? team2 : new Set(["o1"]);
+  game.team2 = game.isMultiPlayer ? team2 : new Set(["o1", "o2"]);
 
   game.isSpec = !game.team1.has(game.userId) && !game.team2.has(game.userId);
 
@@ -33,7 +31,7 @@ export const newGame = (app, options, team1, team2) => {
   game.mouse = newMouse(game, app.menu);
   game.keyboard = newKeyBoard(game, app.menu);
 
-  const init = () => {
+  game.build = () => {
     game.players = game.all.map((uuid) => {
       const player = newPlayer(game, uuid);
       player.type = game.isMultiPlayer ? "online" : "bot";
@@ -44,23 +42,35 @@ export const newGame = (app, options, team1, team2) => {
       return player;
     });
 
+    if (game.isSpec) {
+      game.player = newPlayer(game, "");
+      game.player.type = "player";
+      game.player.isAlive = false;
+    }
+
     game.playersMap = new Map(game.players.map((p) => [p.uuid, p]));
 
-    if (game.isSpec) game.player.isAlive = false;
-    game.team1Lights = new Map();
-    game.team2Lights = new Map();
+    game.team1Lights = [];
+    game.team2Lights = [];
 
     game.startTime = performance.now();
     game.shots = new Set();
   };
 
+  let singlePlayerBuilt = false;
   game.init = () => {
-    if (game.isMultiPlayer) return init();
-    game.buildingObstacles = true;
-    initializeObstacles(game, () => {
-      setTimeout(init());
-      game.buildingObstacles = false;
-    });
+    if (game.isMultiPlayer) return game.build();
+
+    if (!singlePlayerBuilt) {
+      game.buildingObstacles = true;
+      return initializeObstacles(game, () => {
+        game.build();
+        game.buildingObstacles = false;
+        singlePlayerBuilt = true;
+      });
+    }
+
+    game.choosingObstacle = true;
   };
 
   game.init();
@@ -101,6 +111,8 @@ export const newPlayer = (game, uuid) => {
   return {
     uuid,
     isAlive: true,
+
+    radius: game.playerRadius,
 
     team1: game.team1.has(uuid),
     team2: game.team2.has(uuid),

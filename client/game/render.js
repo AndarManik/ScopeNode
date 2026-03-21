@@ -6,7 +6,7 @@ import { createPlayerRenderer } from "./playerrendering.js";
 import { animateShot } from "./shootanimation.js";
 
 export const render = (game) => {
-  const { renderSettings, color, mapWidth, mapHeight, playerRadius } = game;
+  const { renderSettings, color, mapWidth, mapHeight } = game;
 
   ensureSceneCanvases(game, renderSettings, mapWidth, mapHeight);
 
@@ -16,30 +16,23 @@ export const render = (game) => {
   drawObstacles(game, ctx, color);
 
   if (game.choosingObstacle || game.previewingObstacle) {
-    renderObstaclePreviewScene(game, ctx, color, renderSettings, playerRadius);
+    renderObstaclePreviewScene(game, ctx, color, renderSettings);
     return;
   }
 
   renderTeamLights(game, color, renderSettings);
-  renderMouseDot(ctx, game, color, playerRadius);
+  renderMouseDot(ctx, game, color);
 
-  renderPlayerPath(ctx, game, color, playerRadius);
+  renderPlayerPath(ctx, game, color);
 
   renderPlayers(game);
 
-  renderObjectiveIfNeeded(
-    game,
-    color,
-    playerRadius,
-    mapWidth,
-    mapHeight,
-    renderSettings,
-  );
-  renderShotsAndWarp(game, ctx, game.shots, playerRadius);
+  renderObjectiveIfNeeded(game, color, mapWidth, mapHeight, renderSettings);
+  renderShotsAndWarp(game, ctx, game.shots);
 };
 
 const renderPlayers = (game) => {
-  const { color, playerRadius, renderSettings, xSwap } = game;
+  const { color, renderSettings, xSwap } = game;
 
   for (const player of game.players) {
     if (!player.isAlive) continue;
@@ -59,7 +52,7 @@ const renderPlayers = (game) => {
 
     const glowParam = renderSettings.glowEnabled
       ? {
-          glowRadius: playerRadius / 1.25,
+          glowRadius: player.radius / 1.25,
           glowColor,
           composite: "screen",
         }
@@ -67,7 +60,8 @@ const renderPlayers = (game) => {
 
     game.drawPlayer(
       player.position,
-      playerRadius,
+      player.radius,
+      game.playerRadius,
       playerColor,
       gunColor,
       player.target,
@@ -125,17 +119,17 @@ const renderTeamLights = (game, color, renderSettings) => {
   const { xSwap, team1Lights, team2Lights } = game;
   game.lightRenderer(
     game,
-    xSwap ? [...team2Lights.values()] : [...team1Lights.values()],
-    xSwap ? [...team1Lights.values()] : [...team2Lights.values()],
+    xSwap ? team2Lights : team1Lights,
+    xSwap ? team1Lights : team2Lights,
     color,
     renderSettings.glowEnabled,
   );
 };
 
-const renderMouseDot = (ctx, game, color, playerRadius) => {
+const renderMouseDot = (ctx, game, color) => {
   ctx.fillStyle = game.player.team1 ? color.team1Path : color.team2Path;
   ctx.beginPath();
-  ctx.arc(game.mouse[0], game.mouse[1], playerRadius / 5, 0, Math.PI * 2);
+  ctx.arc(game.mouse[0], game.mouse[1], game.player.radius / 5, 0, Math.PI * 2);
   ctx.fill();
 };
 
@@ -153,11 +147,11 @@ function strokeFilletedPath(ctx, points, R) {
   ctx.stroke();
 }
 
-const renderPlayerPath = (ctx, game, color, playerRadius) => {
+const renderPlayerPath = (ctx, game, color) => {
   const player = game.player;
   if (!player.isAlive || player.path.length <= 0) return;
 
-  const alpha = computePathAlpha(player.path, playerRadius);
+  const alpha = computePathAlpha(player.path, player.radius);
   if (alpha <= 0) return;
 
   ctx.save();
@@ -166,18 +160,18 @@ const renderPlayerPath = (ctx, game, color, playerRadius) => {
   const pathWidth = 5;
   ctx.strokeStyle = player.team1 ? color.team1Path : color.team2Path;
   ctx.fillStyle = ctx.strokeStyle;
-  ctx.lineWidth = (2 * playerRadius) / pathWidth;
+  ctx.lineWidth = (2 * player.radius) / pathWidth;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
-  const dash = 2 * playerRadius - (2 * playerRadius) / pathWidth;
-  const gap = 2 * playerRadius + (2 * playerRadius) / pathWidth;
+  const dash = 2 * player.radius - (2 * player.radius) / pathWidth;
+  const gap = 2 * player.radius + (2 * player.radius) / pathWidth;
   ctx.setLineDash([dash, gap]);
   ctx.lineDashOffset = (2 * (gap + dash)) / pathWidth;
 
   // path
   ctx.beginPath();
-  strokeFilletedPath(ctx, player.path, playerRadius);
+  strokeFilletedPath(ctx, player.path, player.radius);
 
   // final position
   const last = player.path[player.path.length - 1];
@@ -185,7 +179,7 @@ const renderPlayerPath = (ctx, game, color, playerRadius) => {
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
     ctx.beginPath();
-    ctx.arc(last[0], last[1], playerRadius, 0, Math.PI * 2);
+    ctx.arc(last[0], last[1], player.radius, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -219,7 +213,6 @@ const computePathAlpha = (path, playerRadius) => {
 const renderObjectiveIfNeeded = (
   game,
   color,
-  playerRadius,
   mapWidth,
   mapHeight,
   renderSettings,
@@ -231,20 +224,20 @@ const renderObjectiveIfNeeded = (
   game.drawObjective(
     game,
     timeAlpha,
-    playerRadius,
+    game.playerRadius,
     mapWidth,
     mapHeight,
     color,
     renderSettings.glowEnabled
       ? {
-          glowRadius: playerRadius / 1.25,
+          glowRadius: game.playerRadius / 1.25,
           glowColor: color.team1Objective,
           composite: "screen",
         }
       : null,
     renderSettings.glowEnabled
       ? {
-          glowRadius: playerRadius / 1.25,
+          glowRadius: game.playerRadius / 1.25,
           glowColor: color.team2Objective,
           composite: "screen",
         }
@@ -252,7 +245,7 @@ const renderObjectiveIfNeeded = (
   );
 };
 
-const renderShotsAndWarp = (game, ctx, shots, playerRadius) => {
+const renderShotsAndWarp = (game, ctx, shots) => {
   const s = game.scale;
   const bullets = [];
 
@@ -263,8 +256,8 @@ const renderShotsAndWarp = (game, ctx, shots, playerRadius) => {
 
   game.warpFX.render({
     pointsPx: bullets,
-    ampPx: 0.25 * playerRadius * s,
-    sigmaPx: 100 * playerRadius * s,
+    ampPx: 0.25 * game.playerRadius * s,
+    sigmaPx: 100 * game.playerRadius * s,
     xSwap: game.xSwap,
   });
 };
@@ -341,6 +334,7 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
   game.drawPlayer(
     game.spawn1,
     playerRadius,
+    game.playerRadius,
     game.xSwap ? color.team2Player : color.team1Player,
     game.xSwap ? color.team2Gun : color.team1Gun,
     Math.atan2(
@@ -371,6 +365,7 @@ const drawPreviewSpawnsAndObjective = (game, ctx, color, renderSettings) => {
   game.drawPlayer(
     game.spawn2,
     playerRadius,
+    game.playerRadius,
     game.xSwap ? color.team1Player : color.team2Player,
     game.xSwap ? color.team1Gun : color.team2Gun,
     Math.atan2(
@@ -409,6 +404,7 @@ const drawPreviewShots = (game, ctx, color, renderSettings) => {
     game.drawPlayer(
       killerPosition,
       playerRadius,
+      game.playerRadius,
       killerBodyColor,
       killerGunColor,
       killerAngle,
@@ -436,6 +432,7 @@ const drawPreviewShots = (game, ctx, color, renderSettings) => {
     game.drawPlayer(
       killedPosition,
       playerRadius,
+      game.playerRadius,
       killedBodyColor,
       killedGunColor,
       killedAngle,

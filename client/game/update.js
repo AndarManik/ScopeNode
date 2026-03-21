@@ -13,10 +13,6 @@ import {
 } from "./pathing.js";
 import { kickout } from "./pathkickout.js";
 
-// There are a few abstactions here that are wrong.
-// The same thing happens to each player yet theres a function for each player,
-// depending on where it is.
-
 export const update = (game, app, delta) => {
   game.xSwap = false;
   if (game.renderSettings.preferredSide === "left" && game.player.team2)
@@ -27,27 +23,19 @@ export const update = (game, app, delta) => {
   if (game.previewingObstacle) return;
   if (game.buildingObstalces) return;
   if (game.choosingObstacle) return newObstaclePreview(game, app.socket);
+  if (game.isMultiPlayer) updateShots(game, delta);
+  else updateSinglePlayerShots(game, delta);
 
   if (!game.pathGraph) return;
-
   updatePlayerPosition(game, delta);
-
-  game.team1Target = [...game.team1Lights.values()];
-  game.team2Target = [...game.team2Lights.values()];
-
   if (game.isMultiPlayer) updateGlobalPositions(game, app, delta);
   else updateBotPositions(game, delta);
 
-  game.team1Lights = new Map();
-  game.team2Lights = new Map();
   if (!game.lightGraph) return;
 
   updateLights(game);
   updateTargets(game, delta);
   updateAdvantage(game);
-
-  if (game.isMultiPlayer) updateShots(game, delta);
-  else updateSinglePlayerShots(game, delta);
 };
 
 const updatePlayerPosition = (game, delta) => {
@@ -57,6 +45,56 @@ const updatePlayerPosition = (game, delta) => {
   const ctrlSlow = game.keyboard.ctrl ? 1 / 2 : 1;
   player.moveSpeed = shiftSlow * ctrlSlow * game.moveSpeed;
   const step = player.moveSpeed * game.playerRadius * delta;
+  const target = getPlayerPathTarget(game);
+  player.path = planPath(game, player.position, target).path;
+  if (!game.preRound) moveAlongPath(player.position, player.path, step);
+
+  const objective = objectiveLocation(game, player);
+  player.distanceToObj = planPath(game, player.position, objective).distance;
+};
+
+const updatePlayerPositionNewUnused = (game, delta) => {
+  if (!game.player.isAlive) return;
+  const player = game.player;
+
+  const baseRadius = game.playerRadius;
+  const baseMoveSpeed = game.moveSpeed;
+
+  const radiusScale = 1.5;
+  const gamma = 0.25;
+
+  const maxRadius = baseRadius * radiusScale;
+
+  if (player.radius == null) player.radius = baseRadius;
+
+  const targetRadius = game.keyboard.shift ? maxRadius : baseRadius;
+
+  const radiusRange = maxRadius - baseRadius;
+  const rate = 0.25;
+
+  if (player.radius < targetRadius) {
+    player.radius = Math.min(
+      player.radius + (radiusRange * delta) / rate,
+      targetRadius,
+    );
+  } else if (player.radius > targetRadius) {
+    player.radius = Math.max(
+      player.radius - (radiusRange * delta) / rate,
+      targetRadius,
+    );
+  }
+
+  const t = (player.radius - baseRadius) / radiusRange;
+
+  const speedScale = Math.pow(radiusScale, gamma);
+  const maxMoveSpeed = baseMoveSpeed * speedScale;
+
+  player.moveSpeed = baseMoveSpeed + (maxMoveSpeed - baseMoveSpeed) * t;
+
+  if (game.keyboard.ctrl) player.moveSpeed *= 2 / 3;
+
+  const step = player.moveSpeed * player.radius * delta;
+
   const target = getPlayerPathTarget(game);
   player.path = planPath(game, player.position, target).path;
   if (!game.preRound) moveAlongPath(player.position, player.path, step);
@@ -86,18 +124,28 @@ const updateGlobalPositions = (game, app, delta) => {
 };
 
 const updateBotPositions = (game, delta) => {
-  game.team1Distance = makeSafeGraphQueryFromPolys(game, game.team1Target);
-  game.team2Distance = makeSafeGraphQueryFromPolys(game, game.team2Target);
+  game.team1Distance = makeSafeGraphQueryFromPolys(game, game.team1Lights);
+  game.team2Distance = makeSafeGraphQueryFromPolys(game, game.team2Lights);
 
   game.team1Used = [];
   game.team2Used = [];
-  for (const bot of game.players) if (bot.type === "bot") bot.path = null;
+  for (const bot of game.players) {
+    if (bot.type !== "bot") continue;
+
+    const now = performance.now();
+    if (!bot.last || now - bot.last > 250) {
+      bot.path = null;
+      bot.last = now + 250 * Math.random();
+    }
+  }
 
   for (const bot of game.players) {
     if (bot.type !== "bot") continue;
     pathBotToTargets(game, () => [objectiveLocation(game, bot)], bot);
     pathBotToTargets(game, allKillTargets, bot);
     pathBotToTargets(game, allDieTargets, bot);
+
+    if (!bot.path) console.log(bot.uuid, "no target");
   }
 
   for (const bot of game.players)
@@ -107,23 +155,24 @@ const updateBotPositions = (game, delta) => {
 };
 
 const updateLights = (game) => {
+  game.team1Lights = [];
+  game.team2Lights = [];
   for (const player of game.players) {
     if (!player.isAlive) continue;
 
-    player.light =
-      player.type !== "online" || player.seen > 1
-        ? game.lightGraph.shineAt(player.position)
-        : player.light;
+    if (player.type !== "online" || player.seen > 1)
+      player.light = game.lightGraph.shineAt(player.position, player.radius);
+
     player.light[2] = player.position;
     const teamLight = player.team1 ? game.team1Lights : game.team2Lights;
-    teamLight.set(player.uuid, player.light);
+    teamLight.push(player.light);
   }
 };
 
 function updateTargets(game, delta) {
   for (const player of game.players) {
     if (!player.isAlive) continue;
-    const enemies = player.team1 ? game.team2Target : game.team1Target;
+    const enemies = player.team1 ? game.team2Lights : game.team1Lights;
     const rawTarget = registerTarget(player.light, enemies, game.playerRadius);
     const fallback = rawTarget || player.path[1] || player.position;
     player.target = smoothTargetPos(player, player.position, fallback, delta);
@@ -144,6 +193,48 @@ const updateAdvantage = (game) => {
   }
 };
 
+const ctx = new AudioContext();
+
+let gunshotBuffer;
+
+async function loadGunshot() {
+  const res = await fetch("./gunshot.wav");
+  const data = await res.arrayBuffer();
+  gunshotBuffer = await ctx.decodeAudioData(data);
+}
+
+loadGunshot();
+
+function playGunshot({
+  volume = 0.3,
+  volumeJitter = 0.05,
+  pitchJitter = 0.2,
+  offsetJitter = 0.01,
+} = {}) {
+  if (!gunshotBuffer) return;
+
+  const src = ctx.createBufferSource();
+  const gain = ctx.createGain();
+
+  // assign buffer
+  src.buffer = gunshotBuffer;
+
+  // pitch variation (playbackRate)
+  src.playbackRate.value = 1 + (Math.random() * 2 - 1) * pitchJitter;
+
+  // volume variation
+  gain.gain.value = volume + (Math.random() * 2 - 1) * volumeJitter;
+
+  // wiring
+  src.connect(gain);
+  gain.connect(ctx.destination);
+
+  // micro start offset
+  const offset = Math.random() * offsetJitter;
+
+  src.start(0, offset);
+}
+
 const updateSinglePlayerShots = (game, delta) => {
   if (!game.team2.size || !game.team1.size) return;
   const team1States = [];
@@ -160,31 +251,10 @@ const updateSinglePlayerShots = (game, delta) => {
   shots.forEach((shot) => {
     game.shots.add(shot);
     game.playersMap.get(shot.killed).isAlive = false;
+    playGunshot();
   });
 
   const gameOver = !team1States.length || !team2States.length;
-
-  const team1Name = game.renderSettings.xSwap
-    ? game.color.team2Name
-    : game.color.team1Name;
-  const team2Name = game.renderSettings.xSwap
-    ? game.color.team1Name
-    : game.color.team2Name;
-
-  const team1Color = game.renderSettings.xSwap
-    ? game.color.team2Bullet
-    : game.color.team1Bullet;
-  const team2Color = game.renderSettings.xSwap
-    ? game.color.team1Bullet
-    : game.color.team2Bullet;
-
-  if (gameOver) {
-    Huge.classList.remove("fading-out");
-    Huge.style.opacity = 0.9;
-    Huge.style.fontSize = "128px";
-    Huge.innerText = (team1States.length ? team1Name : team2Name) + " Wins";
-    Huge.style.color = team1States.length ? team1Color : team2Color;
-  }
 
   let allFinished = gameOver;
   game.shots.forEach((shot) => {
@@ -204,8 +274,10 @@ const updateSinglePlayerShots = (game, delta) => {
 const updateShots = (game, delta) => {
   game.shots.forEach((shot) => {
     if (shot.finished) return;
-    if (shot.anim == null) shot.anim = 0;
-    else shot.anim += delta;
+    if (shot.anim == null) {
+      shot.anim = 0;
+      playGunshot();
+    } else shot.anim += delta;
   });
 };
 
@@ -244,8 +316,8 @@ function pathBotToTargets(game, targetFunc, bot) {
 
   const isTeam1 = bot.team1;
 
-  const enemyExposure = isTeam1 ? game.team2Target : game.team1Target;
-  const teamExposure = isTeam1 ? game.team1Target : game.team2Target;
+  const enemyExposure = isTeam1 ? game.team2Lights : game.team1Lights;
+  const teamExposure = isTeam1 ? game.team1Lights : game.team2Lights;
   const teamUsed = isTeam1 ? game.team1Used : game.team2Used;
   const avoid = isTeam1 ? game.team2Distance : game.team1Distance;
 
@@ -373,7 +445,6 @@ export function smoothTargetPos(state, pos, desiredPos, delta) {
     desiredPos[0] - pos[0],
   );
 
-  // First frame: snap to target
   if (state.smoothedTargetAngle == null) {
     state.smoothedTargetAngle = desiredAngle;
     state.smoothedTargetAngularVel = 0;
@@ -384,11 +455,9 @@ export function smoothTargetPos(state, pos, desiredPos, delta) {
   const HALF_LIFE = 0.04;
   const lambda = Math.log(2) / HALF_LIFE;
 
-  // Exponential decay toward the target angle
   const error = shortestAngleDelta(desiredAngle, prevAngle);
   const decay = Math.exp(-lambda * delta); // in (0,1)
   const angle = prevAngle + error * (1 - decay);
-  // Derivative (angular velocity) estimate, if you want it
   const vel = shortestAngleDelta(angle, prevAngle) / delta;
   let wrapped = angle;
   while (wrapped > Math.PI) wrapped -= 2 * Math.PI;

@@ -65,6 +65,7 @@ export const createPlayerRenderer = (
     centerX,
     centerY,
     r,
+    gr,
     sliceFrac,
     angle,
     colors,
@@ -156,6 +157,7 @@ export const createPlayerRenderer = (
   const drawPlayer = (
     [cx, cy],
     playerRadius,
+    gr,
     color,
     gun,
     angle = 0,
@@ -167,7 +169,7 @@ export const createPlayerRenderer = (
     // Hard-disable glows if the factory was created with glowEnabled = false
     // OR if this particular call passes glow = null/undefined.
     if (!glowEnabled || !glow) {
-      drawPlayerCore(ctx, cx, cy, r, sliceFrac, angle, {
+      drawPlayerCore(ctx, cx, cy, r, gr, sliceFrac, angle, {
         bodyColor: color,
         gunColor: gun,
         curveColor: color,
@@ -196,7 +198,7 @@ export const createPlayerRenderer = (
     clearCtx(gctx);
 
     // 1. Draw white mask of player into mask buffer
-    drawPlayerCore(mctx, size / 2, size / 2, r, sliceFrac, angle, {
+    drawPlayerCore(mctx, size / 2, size / 2, r, gr, sliceFrac, angle, {
       bodyColor: "white",
       gunColor: "white",
       curveColor: "white",
@@ -221,7 +223,7 @@ export const createPlayerRenderer = (
     ctx.globalCompositeOperation = prevGCO;
 
     // 4. Draw sharp player on top
-    drawPlayerCore(ctx, cx, cy, r, sliceFrac, angle, {
+    drawPlayerCore(ctx, cx, cy, r,gr, sliceFrac, angle, {
       bodyColor: color,
       gunColor: gun,
       curveColor: color,

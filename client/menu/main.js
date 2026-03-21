@@ -19,8 +19,8 @@ export const main = (app) => {
   joinButton.style.fontSize = "40px";
   joinButton.addEventListener("click", () => {});
 
-  const info = menu.newEl(16, 12, 1, 1, "button");
-  info.innerText = "?";
+  const info = menu.newEl(15, 12, 2, 1, "button");
+  info.innerText = "What is this?";
   info.style.background = "var(--light)";
 
   info.addEventListener("click", () => {
