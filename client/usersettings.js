@@ -1,4 +1,4 @@
-const V = "14";
+const V = "19";
 export const addUserSettings = (app) => {
   const version = localStorage.getItem("version");
   if (version != V) {
