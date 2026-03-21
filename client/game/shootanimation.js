@@ -15,8 +15,8 @@ export const animateShot = (game, ctx, shot, s) => {
       killedPosition,
       playerRadius,
       game.playerRadius,
-      gunColor,
       playerColor,
+      gunColor,
       Math.atan2(
         killerPosition[1] - killedPosition[1],
         killerPosition[0] - killedPosition[0],
